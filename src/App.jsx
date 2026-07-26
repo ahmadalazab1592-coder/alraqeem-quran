@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Book, Quote, Type, Calculator, LayoutGrid,Mail, Sparkles, BookOpen, ArrowLeft, ChevronRight, ChevronLeft, X, BookmarkPlus, Save, Trash2, Eye, MessageSquare, Edit3, Scale, Hash, Layers, Search, BarChart3, AlertCircle, ListFilter, Library, Network, Users, Sun, Moon, Info, CheckCircle2, Star, Globe, Crown, Heart, Cloud, User, Clock, ScrollText , Share2, Download , GitMerge, AlertTriangle, Copy } from 'lucide-react';
+import { Book, Quote, Type, Calculator, Plus, LayoutGrid, Mail, Sparkles, BookOpen, ArrowLeft, ChevronRight, ChevronLeft, X, BookmarkPlus, Save, Trash2, Eye, MessageSquare, Edit3, Scale, Hash, Layers, Search, BarChart3, AlertCircle, ListFilter, Library, Network, Users, Sun, Moon, Info, CheckCircle2, Star, Globe, Crown, Heart, Cloud, User, Clock, ScrollText , Share2, Download , GitMerge, AlertTriangle, Copy } from 'lucide-react';
 
 // استدعاء قواعد البيانات من الملفات المنفصلة
 import quranDatabase from './data/quran.json';
 import encyclopediaDataRaw from './data/encyclopedia.json';
-
+import { Analytics } from "@vercel/analytics/react";
+import html2canvas from 'html2canvas';
 // تأمين قراءة بيانات الموسوعة للتوافق مع مختلف بيئات البناء (Vite, Webpack, etc.)
 const encyclopediaData = Array.isArray(encyclopediaDataRaw) 
   ? encyclopediaDataRaw 
@@ -25,7 +26,9 @@ const letterValues = {
 
 const exceptionRoots = ['قرءان', 'سيء', 'جءر', 'الءن','ءابا',
    'هنيء', 'مريء', 'تكء', 'فءد', 'خطيء', 'يسء', 'فمالء', 'مشءم', 'يستءخر', 'شيء','شىء', 'بريء', 'برىء','خبء', 'دفء'];
-const badEndings = ['في', 'من', 'على', 'الى', 'إلى', 'عن', 'ثم', 'أو', 'ان', 'إن', 'أن', 'لا', 'ما', 'لم', 'لن', 'هل', 'بل', 'قد', 'لقد', 'حتى', 'الا', 'إلا', 'لكن', 'إنما', 'كأن'];
+const badEndings = ['في','فى', 'من', 'على', 'الى', 'إلى', 'عن', 'ثم', 'أو', 'ان', 'إن', 'أن', 'لا', 'ما', 'لم', 'لن', 'هل', 'بل', 'قد', 'لقد', 'حتى', 'الا', 'إلا', 'لكن', 'إنما', 'كأن'];
+// استبعاد المضافات التي تحتاج إلى مضاف إليه (مثل: رب العالمين)
+const incompleteEndings = ['رب', 'عبد', 'ابن', 'أبي', 'أبا', 'بني', 'ذو', 'ذي', 'ذا', 'أولي', 'أولو', 'غير', 'بعض', 'كل', 'ايها', 'أيها', 'أيتها', 'بين', 'عند', 'مع', 'دون', 'سوى', 'لدى', 'فوق', 'تحت', 'خلف', 'امام', 'أمام', 'وراء', 'الذي', 'التي', 'هذا', 'هذه'];
 const yaExceptions = [
   'يحى','تحى','نحى','أحى','هداى','خزى','محياى','مثواى','رءيى','إيى',
   'ٱثنى', 'وبنى','بنى','يبنى', 'يؤذى',  'عصاى', 'رءياى', 'إياى', 'بشراى', 
@@ -260,6 +263,9 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('quran_favorite_surahs', JSON.stringify(favoriteSurahs));
   }, [favoriteSurahs]);
+// مخزن تجميع النتائج المتعددة للتقرير
+  const [stashedResults, setStashedResults] = useState([]);
+  const [isCanvasModalOpen, setIsCanvasModalOpen] = useState(false);
 
   const toggleFavoriteSurah = (surahId, e) => {
     e.stopPropagation(); // لمنع فتح السورة عند النقر على النجمة فقط
@@ -303,7 +309,9 @@ export default function App() {
   const [globalSearchResults, setGlobalSearchResults] = useState([]);
   const [hasActiveSearch, setHasActiveSearch] = useState(false);
   const [isMethodologyModalOpen, setIsMethodologyModalOpen] = useState(false); 
-
+// أضف هذا السطر مع بقية متغيرات الـ useState في الأعلى
+  const [showSplash, setShowSplash] = useState(true);
+  const [isFadingOut, setIsFadingOut] = useState(false); // 🌟 أضف هذا السطر
   const [selectionMode, setSelectionMode] = useState('word');
   const [selectedWords, setSelectedWords] = useState(new Set());
   const [selectedAyahs, setSelectedAyahs] = useState(new Set());
@@ -328,6 +336,78 @@ export default function App() {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
 
+const handleAddToStash = () => {
+    const scope = getSearchScope();
+    
+    if (scope.length === 0) {
+        alert("الرجاء تحديد نص أولاً قبل الإضافة للتقرير.");
+        return;
+    }
+
+    let formattedText = "";
+    let totalValue = 0; 
+    let totalLetters = 0; // 🌟 أضفنا متغير لجمع الحروف المنضبطة
+    
+    for (let i = 0; i < scope.length; i++) {
+        const currentItem = scope[i];
+        const nextItem = scope[i + 1];
+        
+        formattedText += currentItem.text;
+        totalValue += currentItem.value;
+        totalLetters += currentItem.letterCount; // 🌟 نجمع الحروف من خوارزمية التطبيق وليس من التشكيل
+
+        const currentAyaNum = currentItem.ayahId; 
+        const nextAyaNum = nextItem ? nextItem.ayahId : null;
+
+        if (currentAyaNum !== undefined && currentAyaNum !== null && currentAyaNum !== nextAyaNum) {
+            formattedText += ` ﴿${currentAyaNum}﴾ `;
+        } else {
+            formattedText += " "; 
+        }
+    }
+
+    const newRecord = {
+      id: Date.now(),
+      text: formattedText.trim(),
+      count: totalLetters, // 🌟 التعديل السحري هنا للحروف
+      wordCount: scope.length,
+      numericalValue: totalValue
+    };
+
+    setStashedResults((prevResults) => [...prevResults, newRecord]);
+    alert("تمت الإضافة إلى التقرير المجمع بنجاح!"); 
+  };
+
+// 🌟 دالة تصدير اللوحة الفنية كصورة
+  const handleExportCanvas = async () => {
+    // تحديد العنصر الذي نريد تصويره عبر الـ ID الذي وضعناه له
+    const canvasElement = document.getElementById('export-canvas-container');
+    
+    if (!canvasElement) return;
+
+    try {
+      // استخدام المكتبة لتحويل العنصر إلى كائن Canvas
+      const canvas = await html2canvas(canvasElement, {
+        scale: 2, // مضاعفة الدقة لتكون الصورة واضحة جداً (HD)
+        useCORS: true, // السماح بتحميل أي خطوط أو مصادر خارجية بسلام
+        backgroundColor: '#0f172a', // لون الخلفية الأساسي لضمان عدم وجود حواف شفافة
+      });
+      
+      // تحويل الـ Canvas إلى رابط صورة PNG
+      const image = canvas.toDataURL("image/png");
+      
+      // إنشاء رابط وهمي للتحميل التلقائي
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `تقرير_الرقيم_${Date.now()}.png`; // اسم الملف
+      link.click();
+      
+    } catch (error) {
+      console.error("Error exporting image:", error);
+      alert("عذراً، حدث خطأ أثناء تصدير الصورة.");
+    }
+  };
+  
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Cairo:wght@400;700;900&display=swap';
@@ -599,6 +679,22 @@ export default function App() {
           currentSum += fw.value;
           currentLetters += fw.letterCount;
 
+          // 🌟 بداية الفلتر الذكي للمعنى (لمنع النهايات المبتورة)
+          const currentWordText = fw.cleanText || fw.text; // الحصول على الكلمة بدون تشكيل
+          
+          if (typeof isStrictSearch !== 'undefined' && isStrictSearch) {
+              // في حالة تفعيل الفلتر: نستبعد حروف الجر والمضاف الذي يحتاج مضاف إليه
+              if (badEndings.includes(currentWordText) || incompleteEndings.includes(currentWordText)) {
+                  continue; // تجاوز هذا التطابق، لكن أكمل البحث في الكلمات التالية
+              }
+          } else if (typeof badEndings !== 'undefined') {
+              // في حالة البحث الرياضي العادي: نستبعد حروف الجر القاطعة جداً في النهاية فقط كحد أدنى من الحماية
+              if (badEndings.includes(currentWordText)) {
+                  continue;
+              }
+          }
+          // 🌟 نهاية الفلتر الذكي للمعنى
+
           if (start === selectedStart && end === selectedEnd) continue;
 
           let isMatch = false;
@@ -839,10 +935,37 @@ export default function App() {
 
   return (
     <div 
-      className={`flex flex-col h-[100dvh] w-full ${t.bg} ${t.text} overflow-hidden relative transition-colors duration-300 ${isReadingMode ? 'reading-mode' : ''}`} 
+      className={`notranslate flex flex-col h-[100dvh] w-full ${t.bg} ${t.text} overflow-hidden relative transition-colors duration-300 ${isReadingMode ? 'reading-mode' : ''}`} 
       style={{ fontFamily: "'Cairo', sans-serif", direction: 'rtl' }}
       onMouseUp={handleDragEnd} onMouseLeave={handleDragEnd} onTouchEnd={handleDragEnd}
     >
+    {/* 🌟 شاشة الفيديو الترحيبي مع انتقال ناعم */}
+      {showSplash && (
+        <div className={`fixed inset-0 z-[100] bg-[#020617] flex items-center justify-center transition-opacity duration-500 ${isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <video
+            autoPlay
+            muted
+            playsInline
+            onEnded={() => {
+              setIsFadingOut(true); // نبدأ تأثير الاختفاء الناعم
+              setTimeout(() => setShowSplash(false), 500); // نزيل العنصر تماماً بعد انتهاء مدة التلاشي (نصف ثانية)
+            }}
+            className="w-full h-full object-contain"
+          >
+            <source src="/splash.mp4" type="video/mp4" />
+          </video>
+          
+          <button 
+            onClick={() => {
+              setIsFadingOut(true);
+              setTimeout(() => setShowSplash(false), 500);
+            }}
+            className="absolute top-8 left-8 text-white/50 hover:text-white bg-white/5 px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-md transition-all border border-white/10 shadow-sm"
+          >
+            تخطي
+          </button>
+        </div>
+      )}
       <div className="fixed inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: `radial-gradient(${isDarkMode ? '#ffffff' : '#000000'} 1px, transparent 1px)`, backgroundSize: '30px 30px' }}></div>
 
       {/* الموديلات والنوافذ المنبثقة */}
@@ -1267,7 +1390,7 @@ export default function App() {
         <div className={`sticky top-0 z-40 ${t.headerBg} backdrop-blur-xl border-b ${t.border} px-4 md:px-8 py-2 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 transition-colors duration-300`}>
            <div className="text-center md:text-right flex items-center gap-4">
               <div>
-                 <h1 className="text-2xl font-bold text-white">
+                 <h1 className="text-2xl font-bold ">
    الرَّقِيم <span className="text-sm text-cyan-400 font-normal">منظومة الأعداد في القرآن الكريم</span>
 </h1>
                  <p className={`${t.textMuted} text-[10px] md:text-xs flex items-center mt-1`}>
@@ -1369,7 +1492,7 @@ export default function App() {
                   </span>
                   <div className="flex gap-2">
                     <button onClick={() => openCommentModal()} className="rounded-xl flex items-center text-xs px-4 py-2 font-bold transition-all bg-[#d4af37] text-white hover:bg-[#b48f27]"><BookmarkPlus className="w-4 h-4 ml-1" /> حفظ وتأمل</button>
-                    <button onClick={() => { setDiscoveries([]); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text} ${t.input} rounded-xl p-2`}><X className="w-5 h-5" /></button>
+                    <button onClick={() => { setDiscoveries([]); setDiscoveryMode(null); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text} ${t.input} rounded-xl p-2`}><X className="w-5 h-5" /></button>
                   </div>
                 </div>
                 
@@ -1482,7 +1605,8 @@ export default function App() {
 
                       if (segmentIndex !== -1) {
                          let color;
-                         if (discoveryMode === 'deep_search') {
+                         // 🌟 أضفنا شروط حماية إضافية لمنع انهيار التطبيق (الشاشة البيضاء)
+                         if (discoveryMode === 'deep_search' && discoveries.length > 0 && discoveries[activeDiscoveryIndex]) {
                             color = discoveries[activeDiscoveryIndex].segments[segmentIndex].isPrimary ? segmentColors[0] : segmentColors[1];
                          } else {
                             color = segmentColors[segmentIndex % segmentColors.length];
@@ -1745,22 +1869,46 @@ export default function App() {
           </div>
           
           {/* 🌟 أزرار الإجراءات المباشرة (النسخ والتصدير) - تظهر فقط عند التحديد */}
-          {(selectedWords.size > 0 || selectedAyahs.size > 0) && (
-            <div className="flex justify-between items-center max-w-3xl mx-auto w-full px-2 mb-3">
-              
-              {/* زر النسخ القديم (يمين) */}
-              <button onClick={handleCopySelectedText} className="flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md border border-emerald-500">
-                <Copy className="w-3 h-3 ml-1" /> نسخ التحديد
-              </button>
+{(selectedWords.size > 0 || selectedAyahs.size > 0) && (
+  <div className="flex justify-between items-center max-w-3xl mx-auto w-full px-2 mb-3">
+    
+    {/* زر النسخ القديم (يمين) */}
+    <button onClick={handleCopySelectedText} className="flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md border border-emerald-500">
+      <Copy className="w-3 h-3 ml-1" /> نسخ التحديد
+    </button>
 
-              {/* 🌟 زر تصدير النتيجة الجديد (يسار) */}
-              <button onClick={() => setIsExportModalOpen(true)} className="flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-[#d4af37]/20 text-[#d4af37] hover:bg-[#d4af37]/40 shadow-sm border border-[#d4af37]/30">
-                <Share2 className="w-3 h-3 ml-1" /> تصدير النتيجة
-              </button>
+    {/* 🌟 مجموعة أزرار التصدير والإضافة واللوحة (يسار) */}
+    <div className="flex gap-2">
+      
+      {/* زر تصدير النتيجة الحالية */}
+      <button onClick={() => setIsExportModalOpen(true)} className="flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-[#d4af37]/20 text-[#d4af37] hover:bg-[#d4af37]/40 shadow-sm border border-[#d4af37]/30">
+        <Share2 className="w-3 h-3 ml-1" /> تصدير
+      </button>
 
-            </div>
-          )}
+      {/* مجموعة أزرار الإضافة وفتح اللوحة */}
+      <div className="flex items-center">
+        <button 
+          onClick={handleAddToStash} 
+          className={`flex items-center px-3 py-1.5 text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md border border-emerald-500 ${stashedResults.length > 0 ? 'rounded-r-full border-l-0' : 'rounded-full'}`}
+        >
+          <Plus className="w-3 h-3 ml-1" /> إضافة
+        </button>
+        
+        {/* زر فتح اللوحة (يظهر فقط إذا كان هناك عناصر مضافة) */}
+        {stashedResults.length > 0 && (
+          <button 
+            onClick={() => setIsCanvasModalOpen(true)} 
+            className="flex items-center px-3 py-1.5 rounded-l-full text-xs font-bold transition-all bg-emerald-700 hover:bg-emerald-800 text-white shadow-md border border-emerald-700 border-r-0"
+          >
+            اللوحة ({stashedResults.length})
+          </button>
+        )}
+      </div>
 
+    </div>
+
+  </div>
+)}
           <div className="flex justify-center gap-3 max-w-3xl mx-auto w-full">
             <button onClick={handleCalculateStats} className="flex-1 flex flex-col items-center justify-center bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 py-2 rounded-2xl font-bold transition-all border border-indigo-500/30 shadow-sm">
               <BarChart3 className="w-5 h-5 mb-1" /> <span className="text-xs tracking-wide">1. إحصاء النص</span>
@@ -1807,7 +1955,21 @@ export default function App() {
                   const scope = getSearchScope();
                   if (scope.length === 0) return null;
                   
-                  const actualText = scope.map(fw => fw.text).join(' ');
+                  // 🌟 الكود الجديد لتوليد النص مع أرقام الآيات
+                  let actualText = "";
+                  for (let i = 0; i < scope.length; i++) {
+                      const currentItem = scope[i];
+                      const nextItem = scope[i + 1];
+                      actualText += currentItem.text;
+                      const currentAyaNum = currentItem.ayahId;
+                      const nextAyaNum = nextItem ? nextItem.ayahId : null;
+                      if (currentAyaNum !== undefined && currentAyaNum !== null && currentAyaNum !== nextAyaNum) {
+                          actualText += ` ﴿${currentAyaNum}﴾ `;
+                      } else {
+                          actualText += " ";
+                      }
+                  }
+                  actualText = actualText.trim();
                   let currentWords = scope.length;
                   let currentLetters = 0;
                   let currentValue = 0;
@@ -1899,6 +2061,104 @@ export default function App() {
                       </div>
                   );
               })()
+          )}
+          <Analytics />
+          {/* 🌟 نافذة اللوحة الفنية للتقرير المجمع (Canvas) - التصميم الجديد */}
+          {isCanvasModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+              <div className="bg-slate-900 border border-[#d4af37]/50 rounded-3xl w-full max-w-2xl shadow-2xl animate-fade-in-up my-auto flex flex-col max-h-[90vh]">
+
+                {/* 🌟 ترويسة اللوحة وزر الإغلاق */}
+                <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Share2 className="w-5 h-5 text-[#d4af37]" /> التقرير الإحصائي المجمع
+                  </h3>
+                  <button onClick={() => setIsCanvasModalOpen(false)} className="text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* 🌟 منطقة اللوحة التي سيتم تصويرها (Canvas) */}
+                <div className="overflow-y-auto custom-scrollbar p-6 grow bg-slate-950/50">
+                  <div id="export-canvas-container" className="bg-slate-800/90 p-6 rounded-2xl border border-white/10 relative">
+                    
+                    <div className="text-center mb-6 border-b border-white/10 pb-4">
+                      <h2 className="text-2xl font-bold text-[#d4af37] mb-1">الرَّقِيم</h2>
+                      <p className="text-sm text-slate-300">التقرير الإحصائي المجمع للآيات</p>
+                    </div>
+
+                    <div className="space-y-6">
+                      {stashedResults.map((item, index) => {
+                        // حسابات مضاعفات 19 التلقائية
+                        const isWords19 = item.wordCount > 0 && item.wordCount % 19 === 0;
+                        const isLetters19 = item.count > 0 && item.count % 19 === 0;
+                        const isValue19 = item.numericalValue > 0 && item.numericalValue % 19 === 0;
+
+                        return (
+                          <div key={item.id} className="bg-slate-900/60 rounded-xl border border-white/5 p-5 relative shadow-inner">
+                            <div className="absolute top-0 right-0 bg-[#d4af37]/20 text-[#d4af37] text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-xl">
+                              نتيجة {index + 1}
+                            </div>
+                            
+                            <p className="mt-4 mb-5 text-[#d4af37] text-xl md:text-2xl leading-loose text-center" style={{ fontFamily: "'Amiri Quran', serif" }}>
+                              "{item.text}"
+                            </p>
+
+                            <div className="space-y-2 text-sm bg-slate-800/80 p-3 rounded-xl border border-white/5">
+                              <div className="flex justify-between items-center">
+                                <span className="text-cyan-400">عدد الكلمات:</span>
+                                <span className="text-white font-bold flex items-center gap-2">
+                                  {isWords19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {item.wordCount / 19}</span>}
+                                  {item.wordCount} كلمة
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-cyan-400">عدد الحروف:</span>
+                                <span className="text-white font-bold flex items-center gap-2">
+                                  {isLetters19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {item.count / 19}</span>}
+                                  {item.count} حرف
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center border-t border-white/10 pt-2 mt-2">
+                                <span className="text-[#d4af37] font-bold">القيمة العددية:</span>
+                                <span className="text-[#d4af37] font-bold flex items-center gap-2">
+                                  {isValue19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {item.numericalValue / 19}</span>}
+                                  {item.numericalValue}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    
+                    <p className="text-xs text-slate-500 text-center mt-6">تم الإحصاء بواسطة تطبيق الرَّقِيم</p>
+                  </div>
+                </div>
+
+                {/* 🌟 أزرار التحكم (خارج منطقة التصوير) */}
+                <div className="p-6 border-t border-white/10 flex gap-3 shrink-0 bg-slate-900 rounded-b-3xl">
+                  <button 
+                    onClick={handleExportCanvas}
+                    className="flex-[2] bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-2 transition-colors"
+                  >
+                    <Download className="w-5 h-5" /> تصدير اللوحة كصورة
+                  </button>
+                  <button 
+                    onClick={() => {
+                        if(window.confirm('هل أنت متأكد من إفراغ اللوحة وحذف كل النتائج؟')) {
+                            setStashedResults([]);
+                            setIsCanvasModalOpen(false);
+                        }
+                    }} 
+                    className="flex-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-white font-bold py-3 rounded-xl flex justify-center items-center transition-colors"
+                  >
+                    إفراغ اللوحة
+                  </button>
+                </div>
+
+              </div>
+            </div>
           )}
     </div>
   );
