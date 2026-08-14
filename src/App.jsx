@@ -275,19 +275,19 @@ export default function App() {
   };
 
   const t = useMemo(() => ({
-    bg: isDarkMode ? "bg-[#020617]" : "bg-slate-50",
-    panel: isDarkMode ? "bg-slate-900" : "bg-white",
-    input: isDarkMode ? "bg-slate-950" : "bg-slate-100",
-    border: isDarkMode ? "border-slate-800" : "border-slate-200",
-    borderFocus: isDarkMode ? "border-slate-700" : "border-slate-300",
-    text: isDarkMode ? "text-slate-50" : "text-slate-900", // ضمان النص الأسود في النهار
-    textMuted: isDarkMode ? "text-slate-400" : "text-slate-600",
-    btn: isDarkMode ? "bg-slate-800 text-white border-slate-700" : "bg-white text-slate-900 border-slate-200 shadow-sm", // خلفية صلبة
+    bg: isDarkMode ? "bg-[#020617]" : "bg-[#e8ecef]",
+    panel: isDarkMode ? "bg-slate-900" : "bg-[#e8ecef]",
+    input: isDarkMode ? "bg-slate-950" : "bg-[#e8ecef]",
+    border: isDarkMode ? "border-slate-800" : "border-slate-300/50",
+    borderFocus: isDarkMode ? "border-slate-700" : "border-[#d4af37]/50",
+    text: isDarkMode ? "text-slate-50" : "text-slate-800",
+    textMuted: isDarkMode ? "text-slate-400" : "text-slate-500",
+    btn: isDarkMode ? "bg-slate-800 text-white border-slate-700" : "bg-white text-slate-900 border-slate-200 shadow-sm",
     btnHover: isDarkMode ? "hover:bg-slate-700" : "hover:bg-slate-50",
     quranText: isDarkMode ? "text-slate-400" : "text-[#0f5132]",
     quranInactive: isDarkMode ? "text-slate-700" : "text-slate-400",
-    headerBg: isDarkMode ? "bg-[#020617]/90" : "bg-white/90",
-    bottomBg: isDarkMode ? "bg-[#020617]/95" : "bg-white/95",
+    headerBg: isDarkMode ? "bg-[#020617]/90" : "bg-[#e8ecef]/90",
+    bottomBg: isDarkMode ? "bg-[#020617]/95" : "bg-[#e8ecef]/95",
   }), [isDarkMode]);
 
   const [activeTab, setActiveTab] = useState('main'); 
@@ -346,18 +346,24 @@ const handleAddToStash = () => {
 
     let formattedText = "";
     let totalValue = 0; 
-    let totalLetters = 0; // 🌟 أضفنا متغير لجمع الحروف المنضبطة
+    let totalLetters = 0; 
     
+    const ayahNumbers = new Set();
+
     for (let i = 0; i < scope.length; i++) {
         const currentItem = scope[i];
         const nextItem = scope[i + 1];
         
         formattedText += currentItem.text;
         totalValue += currentItem.value;
-        totalLetters += currentItem.letterCount; // 🌟 نجمع الحروف من خوارزمية التطبيق وليس من التشكيل
+        totalLetters += currentItem.letterCount; 
 
         const currentAyaNum = currentItem.ayahId; 
         const nextAyaNum = nextItem ? nextItem.ayahId : null;
+
+        if (currentAyaNum !== undefined && currentAyaNum !== null) {
+            ayahNumbers.add(currentAyaNum);
+        }
 
         if (currentAyaNum !== undefined && currentAyaNum !== null && currentAyaNum !== nextAyaNum) {
             formattedText += ` ﴿${currentAyaNum}﴾ `;
@@ -366,40 +372,86 @@ const handleAddToStash = () => {
         }
     }
 
+    // 🌟 المتغير الصحيح الذي استخرجناه من الأكواد
+    const currentSurahId = activeSurahId; 
+    
+    let detectedSurahName = "";
+    if (typeof quranDatabase !== 'undefined' && currentSurahId) {
+        // نبحث عن السورة في قاعدة البيانات باستخدام الـ ID
+        const surah = quranDatabase.find(s => s.id === currentSurahId);
+        if (surah) {
+            detectedSurahName = surah.name;
+        }
+    }
+
     const newRecord = {
       id: Date.now(),
       text: formattedText.trim(),
-      count: totalLetters, // 🌟 التعديل السحري هنا للحروف
+      count: totalLetters, 
       wordCount: scope.length,
-      numericalValue: totalValue
+      numericalValue: totalValue,
+      // 🌟 الآن اسم السورة وأرقام الآيات جاهزة للعرض في اللوحة
+      surahName: detectedSurahName,
+      ayahNumbers: Array.from(ayahNumbers)
     };
 
     setStashedResults((prevResults) => [...prevResults, newRecord]);
     alert("تمت الإضافة إلى التقرير المجمع بنجاح!"); 
   };
 
-// 🌟 دالة تصدير اللوحة الفنية كصورة
+// 🌟 دالة تصدير اللوحة الفنية كصورة (بخلفية إسلامية "نجمة ثمانية" وبدون تشوهات)
   const handleExportCanvas = async () => {
-    // تحديد العنصر الذي نريد تصويره عبر الـ ID الذي وضعناه له
     const canvasElement = document.getElementById('export-canvas-container');
-    
     if (!canvasElement) return;
 
     try {
-      // استخدام المكتبة لتحويل العنصر إلى كائن Canvas
+      const exportBgColor = isDarkMode ? '#0f172a' : '#fdfbf7'; 
+      const patternOpacity = isDarkMode ? '0.05' : '0.08';
+      
+      // 🌟 زخرفة إسلامية حقيقية (النجمة الثمانية / ربع الحزب) بدلاً من النمط السابق
+      const bgPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23d4af37' stroke-opacity='${patternOpacity}' stroke-width='1.5'%3E%3Cpath d='M15 15h30v30H15z'/%3E%3Cpath d='M30 8.787l21.213 21.213-21.213 21.213L8.787 30 30 8.787z'/%3E%3C/g%3E%3C/svg%3E")`;
+
       const canvas = await html2canvas(canvasElement, {
-        scale: 2, // مضاعفة الدقة لتكون الصورة واضحة جداً (HD)
-        useCORS: true, // السماح بتحميل أي خطوط أو مصادر خارجية بسلام
-        backgroundColor: '#0f172a', // لون الخلفية الأساسي لضمان عدم وجود حواف شفافة
+        scale: 3, 
+        useCORS: true,
+        backgroundColor: exportBgColor,
+        logging: false,
+        onclone: (clonedDoc) => {
+            // 🌟 استخدام طريقة الحقن الآمنة (Style Injection) لمنع تشوه العناصر والبطاقات
+            const style = clonedDoc.createElement('style');
+            style.innerHTML = `
+              /* إزالة ظلال النصوص لمنع تشوه الخط القرآني */
+              * { text-shadow: none !important; letter-spacing: normal !important; }
+              
+              /* تطبيق الزخرفة الإسلامية على الخلفية */
+              #export-canvas-container { 
+                  background-color: ${exportBgColor} !important;
+                  background-image: ${bgPattern} !important;
+                  border: 2px solid rgba(212, 175, 55, 0.4) !important;
+              }
+              
+              /* تحويل البطاقات البارزة لتصميم مسطح ملكي ثابت */
+              .neo-out { 
+                  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.25) !important; 
+                  border: 1px solid rgba(212, 175, 55, 0.4) !important; 
+                  background-color: ${isDarkMode ? '#1e293b' : '#ffffff'} !important; 
+              }
+              
+              /* تحويل البطاقات الغائرة لتصميم مسطح أنيق */
+              .neo-in { 
+                  box-shadow: none !important; 
+                  border: 1px solid rgba(150, 150, 150, 0.15) !important; 
+                  background-color: ${isDarkMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)'} !important; 
+              }
+            `;
+            clonedDoc.head.appendChild(style);
+        }
       });
       
-      // تحويل الـ Canvas إلى رابط صورة PNG
-      const image = canvas.toDataURL("image/png");
-      
-      // إنشاء رابط وهمي للتحميل التلقائي
+      const image = canvas.toDataURL("image/png", 1.0);
       const link = document.createElement('a');
       link.href = image;
-      link.download = `تقرير_الرقيم_${Date.now()}.png`; // اسم الملف
+      link.download = `تقرير_الرقيم_${Date.now()}.png`;
       link.click();
       
     } catch (error) {
@@ -1035,77 +1087,114 @@ const handleAddToStash = () => {
          </div>
       )}
 
+{/* 🌟 نافذة البحث عن سورة (بتصميم النيومورفيزم) */}
       {isSurahModalOpen && (
-         <div className="fixed inset-0 z-[70] flex items-start justify-center pt-20 bg-black/80 backdrop-blur-md p-4">
-          <div className={`${t.panel} border ${t.borderFocus} rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fade-in-up`}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className={`text-xl font-bold ${t.text}`}>البحث عن سورة</h3>
-              <button onClick={() => setIsSurahModalOpen(false)} className={`${t.textMuted} hover:${t.text} ${t.input} p-2 rounded-xl`}><X className="w-5 h-5"/></button>
+         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          {/* 🌟 تم إزالة neo-out ووضع ظل داكن كلاسيكي حاد ليفصل النافذة عن الخلفية المعتمة */}
+          <div className={`${t.panel} shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border ${t.border} rounded-3xl p-6 md:p-8 w-full max-w-lg animate-fade-in-up`}>
+            
+            <div className={`flex justify-between items-center mb-6 pb-4 border-b ${t.border}`}>
+              <h3 className={`text-xl font-bold ${t.text} flex items-center gap-2`}>
+                <Search className="w-5 h-5 text-[#b48f27] dark:text-[#d4af37]" /> البحث عن سورة
+              </h3>
+              <button onClick={() => setIsSurahModalOpen(false)} className={`${t.textMuted} hover:text-red-500 neo-out active:neo-in p-2.5 rounded-xl transition-colors`}>
+                <X className="w-5 h-5"/>
+              </button>
             </div>
-            <input 
-              type="text" placeholder="اكتب اسم السورة..." value={surahSearchQuery} onChange={(e) => setSurahSearchQuery(e.target.value)}
-              className={`w-full ${t.input} border ${t.borderFocus} ${t.text} rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-[#d4af37]`} autoFocus
-            />
-            <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+            
+            <div className="relative mb-6">
+              <Search className={`absolute right-4 top-1/2 transform -translate-y-1/2 ${t.textMuted} w-5 h-5`} />
+              <input 
+                type="text" 
+                placeholder="اكتب اسم السورة..." 
+                value={surahSearchQuery} 
+                onChange={(e) => setSurahSearchQuery(e.target.value)}
+                className={`w-full pr-12 pl-4 py-4 rounded-2xl neo-in outline-none font-bold ${t.text} bg-transparent placeholder-slate-400 dark:placeholder-slate-500 transition-all`} 
+                autoFocus
+              />
+            </div>
+            
+            <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-3 pr-2">
                {quranDatabase.filter(s => stripDiacritics(s.name).includes(stripDiacritics(surahSearchQuery))).map(s => {
-                // 🌟 التحقق: هل هذه السورة هي المفتوحة حالياً؟
                 const isActive = activeSurahId === s.id;
 
                 return (
                 <button 
                   key={s.id} 
                   onClick={() => { setActiveSurahId(s.id); setCurrentPage(1); setIsSurahModalOpen(false); clearSelection(); setSurahSearchQuery(''); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }}
-                  // 🌟 تطبيق التظليل الذهبي المضيء للسورة النشطة، وإبقاء التنسيق العادي للباقي
-                  className={`w-full flex justify-between items-center px-4 py-3 rounded-xl transition-all border ${
+                  className={`w-full flex justify-between items-center px-4 py-4 rounded-2xl transition-all ${
                     isActive 
-                      ? "bg-[#d4af37]/20 border-[#d4af37]/50 shadow-[0_0_10px_rgba(212,175,55,0.15)]" 
-                      : `${t.btn} ${t.btnHover} border-transparent`
+                      ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' 
+                      : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`
                   }`}
                 >
-                  <span 
-                    className={`font-bold text-lg pt-1 ${isActive ? "text-[#d4af37]" : t.text}`} 
-                    style={{ fontFamily: "'Amiri Quran', serif" }}
-                  >
-                    سورة {s.name}
-                  </span>
-                  <span className={`text-xs font-sans ${isActive ? "text-[#d4af37]/80" : t.textMuted}`}>
+                  <div className="flex items-center gap-3">
+                     <span className={`text-[10px] px-2 py-1 rounded-md font-bold ${isActive ? 'bg-[#b48f27]/10 dark:bg-[#d4af37]/10' : 'bg-black/5 dark:bg-white/5 opacity-70'}`}>{s.id}</span>
+                     <span className="font-bold text-lg pt-1" style={{ fontFamily: "'Amiri Quran', serif" }}>
+                       سورة {s.name}
+                     </span>
+                  </div>
+                  <span className={`text-xs font-sans font-bold ${isActive ? 'opacity-100' : 'opacity-70'}`}>
                     {s.total_ayahs} آية
                   </span>
                 </button>
               )})}
+              
+              {quranDatabase.filter(s => stripDiacritics(s.name).includes(stripDiacritics(surahSearchQuery))).length === 0 && (
+                <div className={`text-center py-8 font-bold ${t.textMuted}`}>
+                  لم يتم العثور على سورة بهذا الاسم
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
-{isFullIndexOpen && (
-         <div className="fixed inset-0 z-[80] flex flex-col bg-black/60 backdrop-blur-xl p-4 md:p-8 animate-fade-in-up overflow-hidden">
-            <div className={`flex justify-between items-center mb-6 pb-4 border-b border-white/10`}>
-              <div>
-                <h2 className="text-2xl md:text-3xl font-black text-white flex items-center tracking-wide">
-                  <LayoutGrid className="ml-3 w-6 h-6 text-[#d4af37]" /> الفهرس <span className="text-[#d4af37] mr-2">الشامل</span>
-                </h2>
-                <p className="text-slate-300 text-sm mt-1">اختر السورة المطلوبة أو قم بتمييز سورك المفضلة بنجمة للوصول السريع.</p>
+      
+{/* 🌟 نافذة الفهرس الشامل (بتصميم النيومورفيزم) */}
+      {isFullIndexOpen && (
+         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-6 animate-fade-in-up">
+            {/* 🌟 تم إزالة neo-out ووضع ظل داكن للحواف الخارجية */}
+            <div className={`${t.panel} shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border ${t.border} rounded-3xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col`}>
+              
+              <div className={`flex justify-between items-center p-6 border-b ${t.border} shrink-0`}>
+                <div>
+                  <h2 className={`text-2xl md:text-3xl font-black ${t.text} flex items-center tracking-wide`}>
+                    <LayoutGrid className="ml-3 w-6 h-6 md:w-8 md:h-8 text-[#b48f27] dark:text-[#d4af37]" /> الفهرس <span className="text-[#b48f27] dark:text-[#d4af37] mr-2">الشامل</span>
+                  </h2>
+                  <p className={`text-sm ${t.textMuted} mt-1 font-bold`}>اختر السورة المطلوبة أو قم بتمييز سورك المفضلة بنجمة للوصول السريع.</p>
+                </div>
+                <button onClick={() => setIsFullIndexOpen(false)} className={`${t.textMuted} hover:text-red-500 neo-out active:neo-in p-3 rounded-2xl transition-colors`}><X className="w-6 h-6"/></button>
               </div>
-              <button onClick={() => setIsFullIndexOpen(false)} className="text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-colors backdrop-blur-md"><X className="w-6 h-6"/></button>
-            </div>
 
-            <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 pb-20">
-               {/* 🌟 قسم السور المفضلة (يظهر فقط إذا كان هناك مفضلات) */}
+            <div className="flex-grow overflow-y-auto custom-scrollbar p-6">
+               
+               {/* 🌟 قسم السور المفضلة */}
                {favoriteSurahs.length > 0 && (
-                 <div className="mb-8 bg-white/5 p-5 rounded-3xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.1)]">
-                   <h3 className="text-[#d4af37] font-bold mb-4 flex items-center text-lg"><Star className="ml-2 w-5 h-5 fill-[#d4af37]" /> سور قيد البحث (المفضلة)</h3>
-                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+                 <div className="mb-10">
+                   <h3 className={`font-bold mb-6 flex items-center text-xl ${t.text}`}>
+                     <Star className="ml-2 w-6 h-6 text-[#b48f27] dark:text-[#d4af37] fill-current" /> سور قيد البحث (المفضلة)
+                   </h3>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
                      {favoriteSurahs.map(id => {
                        const s = quranDatabase.find(surah => surah.id === id);
                        if (!s) return null;
+                       const isActive = activeSurahId === s.id;
+                       
                        return (
-                         <div key={`fav-${s.id}`} onClick={() => { setActiveSurahId(s.id); setCurrentPage(1); setIsFullIndexOpen(false); clearSelection(); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} className="bg-slate-900/50 hover:bg-slate-800/80 border border-[#d4af37]/30 hover:border-[#d4af37] rounded-2xl p-4 cursor-pointer transition-all hover:-translate-y-1 group flex justify-between items-center shadow-sm">
+                         <div key={`fav-${s.id}`} onClick={() => { setActiveSurahId(s.id); setCurrentPage(1); setIsFullIndexOpen(false); clearSelection(); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} 
+                           className={`rounded-2xl p-4 cursor-pointer transition-all flex justify-between items-center group ${
+                             isActive ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`
+                           }`}
+                         >
                            <div>
-                             <span className="font-bold text-lg text-white block mb-1" style={{ fontFamily: "'Amiri Quran', serif" }}>{s.name}</span>
-                             <span className="text-xs text-slate-400 font-sans">{s.total_ayahs} آية</span>
+                             <div className="flex items-center gap-2 mb-2">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${isActive ? 'bg-[#b48f27]/10 dark:bg-[#d4af37]/10' : 'bg-black/5 dark:bg-white/5 opacity-70'}`}>{s.id}</span>
+                                <span className="font-bold text-xl block" style={{ fontFamily: "'Amiri Quran', serif" }}>{s.name}</span>
+                             </div>
+                             <span className={`text-xs font-sans font-bold ${isActive ? 'opacity-100' : 'opacity-70'}`}>{s.total_ayahs} آية</span>
                            </div>
-                           <button onClick={(e) => toggleFavoriteSurah(s.id, e)} className="p-2 bg-black/20 rounded-xl hover:scale-110 transition-transform">
-                             <Star className="w-5 h-5 text-[#d4af37] fill-[#d4af37]" />
+                           <button onClick={(e) => toggleFavoriteSurah(s.id, e)} className={`p-2.5 rounded-xl transition-all ${isActive ? 'neo-in' : 'bg-black/5 dark:bg-white/5 hover:scale-110'}`}>
+                             <Star className="w-5 h-5 text-[#b48f27] dark:text-[#d4af37] fill-current" />
                            </button>
                          </div>
                        );
@@ -1116,42 +1205,29 @@ const handleAddToStash = () => {
 
                {/* 🌟 قسم كل السور */}
                <div>
-                 <h3 className="text-white font-bold mb-4 flex items-center text-lg"><Book className="ml-2 w-5 h-5" /> المصحف كاملاً (114 سورة)</h3>
-                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+                 <h3 className={`font-bold mb-6 flex items-center text-xl ${t.text}`}>
+                   <Book className="ml-2 w-6 h-6 text-[#b48f27] dark:text-[#d4af37]" /> المصحف كاملاً (114 سورة)
+                 </h3>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
                     {quranDatabase.map(s => {
                       const isFav = favoriteSurahs.includes(s.id);
-                      // 🌟 التحقق: هل هذه السورة هي النشطة/المفتوحة حالياً؟
                       const isActive = activeSurahId === s.id;
 
                       return (
-                        <div 
-                          key={s.id} 
-                          onClick={() => { setActiveSurahId(s.id); setCurrentPage(1); setIsFullIndexOpen(false); clearSelection(); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} 
-                          // 🌟 تطبيق التنسيق الشرطي هنا للبطاقة بالكامل
-                          className={`border rounded-2xl p-4 cursor-pointer transition-all hover:-translate-y-1 group flex justify-between items-center shadow-sm backdrop-blur-sm ${
-                            isActive
-                              ? "bg-gradient-to-r from-[#d4af37]/20 to-[#d4af37]/5 border-[#d4af37]/60 shadow-[0_0_15px_rgba(212,175,55,0.15)]" // السورة المحددة (ذهبي مع إضاءة)
-                              : "bg-slate-900/40 hover:bg-slate-800/80 border-white/5 hover:border-cyan-500/50" // السور العادية
+                        <div key={s.id} onClick={() => { setActiveSurahId(s.id); setCurrentPage(1); setIsFullIndexOpen(false); clearSelection(); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} 
+                          className={`rounded-2xl p-4 cursor-pointer transition-all flex justify-between items-center group ${
+                            isActive ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`
                           }`}
                         >
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
-                               <span className={`text-[10px] px-2 py-0.5 rounded-md ${isActive ? "bg-[#d4af37]/20 text-[#d4af37]" : "bg-slate-800 text-slate-400"}`}>
-                                 {s.id}
-                               </span>
-                               <span 
-                                 className={`font-bold text-lg block transition-colors ${isActive ? "text-[#d4af37]" : "text-white group-hover:text-cyan-400"}`} 
-                                 style={{ fontFamily: "'Amiri Quran', serif" }}
-                               >
-                                 {s.name}
-                               </span>
+                            <div className="flex items-center gap-2 mb-2">
+                               <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${isActive ? 'bg-[#b48f27]/10 dark:bg-[#d4af37]/10' : 'bg-black/5 dark:bg-white/5 opacity-70'}`}>{s.id}</span>
+                               <span className="font-bold text-xl block" style={{ fontFamily: "'Amiri Quran', serif" }}>{s.name}</span>
                             </div>
-                            <span className={`text-xs font-sans ${isActive ? "text-[#d4af37]/80" : "text-slate-400"}`}>
-                              {s.total_ayahs} آية
-                            </span>
+                            <span className={`text-xs font-sans font-bold ${isActive ? 'opacity-100' : 'opacity-70'}`}>{s.total_ayahs} آية</span>
                           </div>
-                          <button onClick={(e) => toggleFavoriteSurah(s.id, e)} className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
-                            <Star className={`w-4 h-4 ${isFav ? 'text-[#d4af37] fill-[#d4af37]' : 'text-slate-500'}`} />
+                          <button onClick={(e) => toggleFavoriteSurah(s.id, e)} className={`p-2.5 rounded-xl transition-all ${isFav ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `bg-black/5 dark:bg-white/5 ${t.textMuted} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
+                            <Star className={`w-5 h-5 ${isFav ? 'fill-current' : ''}`} />
                           </button>
                         </div>
                       );
@@ -1160,268 +1236,298 @@ const handleAddToStash = () => {
                </div>
             </div>
          </div>
+      </div>
       )}
+
+{/* 🌟 نافذة البحث الشامل (بتصميم النيومورفيزم) */}
       {isGlobalSearchModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-start justify-center pt-10 bg-black/80 backdrop-blur-md p-4">
-          <div className={`${t.panel} border border-cyan-500/50 rounded-2xl p-6 w-full max-w-3xl shadow-[0_0_40px_rgba(6,182,212,0.15)] animate-fade-in-up flex flex-col max-h-[85vh]`}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-cyan-500 flex items-center"><Search className="ml-2 w-5 h-5"/> بحث شامل في المصحف</h3>
-              <button onClick={() => setIsGlobalSearchModalOpen(false)} className={`${t.textMuted} hover:${t.text} ${t.input} p-2 rounded-xl`}><X className="w-5 h-5"/></button>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          
+          {/* الحاوية الخارجية بظل داكن كلاسيكي لتجنب الضبابية على الخلفية المعتمة */}
+          <div className={`${t.panel} shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border ${t.border} rounded-3xl p-6 md:p-8 w-full max-w-3xl flex flex-col max-h-[85vh] animate-fade-in-up`}>
+            
+            <div className={`flex justify-between items-center mb-6 pb-4 border-b ${t.border} shrink-0`}>
+              <h3 className={`text-xl md:text-2xl font-bold ${t.text} flex items-center gap-2`}>
+                <Search className="w-6 h-6 text-cyan-600 dark:text-cyan-400"/> بحث شامل في المصحف
+              </h3>
+              <button onClick={() => setIsGlobalSearchModalOpen(false)} className={`${t.textMuted} hover:text-red-500 neo-out active:neo-in p-2.5 rounded-xl transition-colors`}>
+                <X className="w-5 h-5"/>
+              </button>
             </div>
-            <input 
-              type="text" placeholder="ابحث عن أي كلمة أو عبارة في القرآن (بدون تشكيل)..." value={globalSearchQuery} onChange={(e) => handleGlobalSearch(e.target.value)}
-              className={`w-full ${t.input} border ${t.borderFocus} ${t.text} rounded-xl px-4 py-4 focus:outline-none focus:border-cyan-500 text-lg shadow-inner`} autoFocus
-            />
-            <div className="mt-4 flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-3">
+            
+            <div className="relative mb-6 shrink-0">
+              <Search className={`absolute right-4 top-1/2 transform -translate-y-1/2 text-cyan-600 dark:text-cyan-400 w-5 h-5`} />
+              <input 
+                type="text" 
+                placeholder="ابحث عن أي كلمة أو عبارة في القرآن (بدون تشكيل)..." 
+                value={globalSearchQuery} 
+                onChange={(e) => handleGlobalSearch(e.target.value)}
+                className={`w-full pr-12 pl-4 py-4 rounded-2xl neo-in outline-none font-bold ${t.text} bg-transparent placeholder-slate-400 dark:placeholder-slate-500 transition-all text-base md:text-lg`} 
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex-grow overflow-y-auto custom-scrollbar space-y-4 pr-2">
               {globalSearchQuery.trim() === '' ? (
-                 <div className={`text-center ${t.textMuted} py-10`}>اكتب كلمة للبدء بالبحث في جميع السور...</div>
+                 <div className={`text-center font-bold ${t.textMuted} py-10`}>اكتب كلمة للبدء بالبحث في جميع السور...</div>
               ) : globalSearchResults.length === 0 ? (
-                 <div className={`text-center ${t.textMuted} py-10`}>لا توجد نتائج مطابقة لبحثك.</div>
+                 <div className={`text-center font-bold ${t.textMuted} py-10`}>لا توجد نتائج مطابقة لبحثك.</div>
               ) : (
                 globalSearchResults.map((result, idx) => (
-                  <button key={idx} onClick={() => goToGlobalResult(result)} className={`w-full text-right ${t.btn} ${t.btnHover} border ${t.borderFocus} hover:border-cyan-500/50 p-4 rounded-xl transition-all`}>
-                    <div className="flex justify-between items-center mb-2">
-                       <span className={`text-sm font-bold ${t.input} px-3 py-1 rounded-lg text-cyan-500 border ${t.borderFocus} pt-1.5`} style={{ fontFamily: "'Amiri Quran', serif" }}>سورة {result.surahName} - آية {result.ayahNumber}</span>
+                  <button key={idx} onClick={() => goToGlobalResult(result)} className={`w-full text-right p-5 md:p-6 rounded-2xl transition-all neo-out active:neo-in group`}>
+                    <div className="flex justify-between items-center mb-3">
+                       <span className={`text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg neo-in text-cyan-700 dark:text-cyan-400`} style={{ fontFamily: "'Amiri Quran', serif" }}>
+                         سورة {result.surahName} - آية {result.ayahNumber}
+                       </span>
+                       <span className={`text-[10px] md:text-xs font-bold text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors`}>
+                         انتقال للآية ←
+                       </span>
                     </div>
-                    <p className={`font-['Amiri_Quran'] text-xl leading-loose ${t.quranText}`}>{result.text}</p>
+                    <p className={`font-bold text-lg md:text-xl leading-loose ${t.text} group-hover:text-cyan-800 dark:group-hover:text-cyan-300 transition-colors`} style={{ fontFamily: "'Amiri Quran', serif" }}>
+                      {result.text}
+                    </p>
                   </button>
                 ))
               )}
             </div>
+
           </div>
         </div>
       )}
 
+{/* 🌟 نافذة حفظ في المكتبة (إضافة تأملات) */}
       {isCommentModalOpen && (
-         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className={`${t.panel} border border-[#d4af37]/50 rounded-2xl p-6 w-full max-w-lg shadow-[0_0_50px_rgba(212,175,55,0.2)] animate-fade-in-up`}>
-            <h3 className="text-xl font-bold text-[#d4af37] mb-3 flex items-center"><MessageSquare className="ml-2 w-5 h-5" /> حفظ في المكتبة</h3>
-            <textarea className={`w-full h-32 ${t.input} border ${t.borderFocus} rounded-xl p-4 ${t.text} focus:outline-none focus:border-[#d4af37] transition-all resize-none mb-4 custom-scrollbar text-base`} placeholder="اكتب تأملاتك حول هذا الاستكشاف (لماذا يعتبر إعجازاً؟)..." value={commentText} onChange={(e) => setCommentText(e.target.value)} />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setIsCommentModalOpen(false)} className={`px-5 py-2 rounded-xl ${t.btn} font-bold`}>إلغاء</button>
-              <button onClick={saveDiscovery} className="px-6 py-2 rounded-xl bg-gradient-to-l from-[#d4af37] to-[#b48f27] text-white font-bold shadow-lg flex items-center"><Save className="w-4 h-4 ml-2" /> حفظ التأملات</button>
+         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className={`${t.panel} shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border ${t.border} rounded-3xl p-6 md:p-8 w-full max-w-lg animate-fade-in-up`}>
+            
+            <h3 className={`text-xl font-bold ${t.text} mb-6 flex items-center gap-2`}>
+              <MessageSquare className="w-5 h-5 text-[#b48f27] dark:text-[#d4af37]" /> حفظ في المكتبة
+            </h3>
+            
+            <textarea 
+              className={`w-full h-32 neo-in rounded-2xl p-4 font-bold ${t.text} bg-transparent placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all resize-none mb-6 custom-scrollbar text-base md:text-lg`} 
+              placeholder="اكتب تأملاتك حول هذا الاستكشاف (لماذا يعتبر إعجازاً؟)..." 
+              value={commentText} 
+              onChange={(e) => setCommentText(e.target.value)} 
+            />
+            
+            <div className="flex justify-end gap-3 mt-2">
+              <button 
+                onClick={() => setIsCommentModalOpen(false)} 
+                className={`px-5 py-2.5 rounded-xl neo-out active:neo-in font-bold ${t.textMuted} hover:text-red-500 transition-colors`}
+              >
+                إلغاء
+              </button>
+              
+              {/* 🌟 زر الحفظ تم إعداده ليكون واضحاً وبارزاً */}
+              <button 
+                onClick={saveDiscovery} 
+                className="px-6 py-2.5 rounded-xl neo-out active:neo-in text-[#b48f27] dark:text-[#d4af37] font-bold flex items-center transition-all hover:scale-105"
+              >
+                <Save className="w-5 h-5 ml-2" /> حفظ التأملات
+              </button>
             </div>
+            
           </div>
         </div>
       )}
 
+{/* 🌟 نافذة عن التطبيق ومنهجية الحساب */}
       {isMethodologyModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-5 md:p-8 w-full max-w-4xl shadow-[0_0_50px_rgba(6,182,212,0.15)] animate-fade-in-up max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4">
-               <h3 className="text-xl md:text-2xl font-bold text-cyan-400 flex items-center"><Info className="ml-2 w-6 h-6" /> عن التطبيق ومنهجية الحساب</h3>
-               <button onClick={() => setIsMethodologyModalOpen(false)} className="text-slate-500 hover:text-white bg-slate-950 rounded-full p-2"><X className="w-5 h-5"/></button>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-6">
+          <div className={`${t.panel} shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border ${t.border} rounded-3xl p-4 md:p-6 w-full max-w-5xl max-h-[95vh] flex flex-col animate-fade-in-up`}>
+            
+{/* الترويسة مصغرة */}
+            <div className={`flex justify-between items-center mb-4 border-b ${t.border} pb-3 shrink-0`}>
+               <h3 className={`text-lg md:text-xl font-bold text-cyan-700 dark:text-cyan-400 flex items-center`}>
+                 <Info className="ml-2 w-5 h-5" /> عن التطبيق ومنهجية الحساب
+               </h3>
+               <button onClick={() => setIsMethodologyModalOpen(false)} className={`${t.textMuted} hover:text-red-500 neo-out active:neo-in p-2.5 rounded-xl transition-colors`}>
+                 <X className="w-5 h-5"/>
+               </button>
             </div>
             
-            <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-5 text-slate-300 text-sm md:text-base leading-relaxed">
-              {/* 🌟 القسم الافتتاحي: الآيات القرآنية ومقولة المهندس */}
-      <div className="flex flex-col gap-10 mt-2 mb-12 pb-10 border-b border-white/10">
-        
-        {/* 🌟 1. قسم الآيات القرآنية */}
-        <div className="text-center px-2 md:px-6">
-          <div className="inline-flex justify-center items-center w-12 h-12 rounded-full bg-[#d4af37]/10 mb-6 border border-[#d4af37]/20 shadow-[0_0_15px_rgba(212,175,55,0.2)]">
-            <Book className="w-6 h-6 text-[#d4af37]" />
-          </div>
-          
-          {/* البسملة */}
-          <h3 className="text-xl md:text-3xl text-[#d4af37] font-bold text-center mb-6 tracking-wide drop-shadow-md" style={{ fontFamily: "'Amiri Quran', serif" }}>
-            بِسۡمِ ٱللَّهِ ٱلرَّحۡمَـٰنِ ٱلرَّحِیمِ
-          </h3>
-
-          <p className="text-lg md:text-2xl text-slate-100 leading-[2.2] md:leading-[2.5] font-bold text-center mb-8" style={{ fontFamily: "'Amiri Quran', serif" }}>
-            " وَإِذَا سَمِعُوا۟ مَاۤ أُنزِلَ إِلَى ٱلرَّسُولِ تَرَىٰۤ أَعۡیُنَهُمۡ تَفِیضُ مِنَ ٱلدَّمۡعِ مِمَّا عَرَفُوا۟ مِنَ ٱلۡحَقِّۖ یَقُولُونَ رَبَّنَاۤ ءَامَنَّا فَٱكۡتُبۡنَا مَعَ ٱلشَّـٰهِدِینَ (٨٣) وَمَا لَنَا لَا نُؤۡمِنُ بِٱللَّهِ وَمَا جَاۤءَنَا مِنَ ٱلۡحَقِّ وَنَطۡمَعُ أَن یُدۡخِلَنَا رَبُّنَا مَعَ ٱلۡقَوۡمِ ٱلصَّـٰلِحِینَ (٨٤) فَأَثَـٰبَهُمُ ٱللَّهُ بِمَا قَالُوا۟ جَنَّـٰتࣲ تَجۡرِی مِن تَحۡتِهَا ٱلۡأَنۡهَـٰرُ خَـٰلِدِینَ فِیهَاۚ وَذَ ٰ⁠لِكَ جَزَاۤءُ ٱلۡمُحۡسِنِینَ (٨٥) "
-          </p>
-          <span className="inline-block px-6 py-2.5 bg-gradient-to-r from-slate-900 to-slate-800 border border-[#d4af37]/40 rounded-xl text-[#d4af37] text-sm font-bold shadow-lg">
-            [سُورَةُ المَائـِدَةِ: ٨٣-٨٥]
-          </span>
-        </div>
-
-        {/* 🌟 2. بطاقة مقولة المهندس عدنان الرفاعي */}
-        <div className="relative p-6 md:p-10 bg-gradient-to-br from-slate-900/90 to-slate-800/90 rounded-3xl border border-[#d4af37]/30 shadow-[0_8px_32px_0_rgba(0,0,0,0.25)] backdrop-blur-xl group overflow-hidden mx-auto max-w-5xl">
-          
-          {/* أيقونة اقتباس كبيرة وشفافة في الخلفية */}
-          <div className="absolute top-0 right-0 p-4 opacity-5 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-700 pointer-events-none">
-            <Quote className="w-32 h-32 text-[#d4af37]" />
-          </div>
-
-          <div className="relative z-10 flex flex-col items-center text-center">
-            {/* شريط علوي ذهبي صغير */}
-            <div className="w-16 h-1 bg-gradient-to-r from-transparent via-[#d4af37] to-transparent rounded-full mb-8"></div>
-            
-            <p className="text-base md:text-xl text-slate-200 leading-relaxed font-medium mb-10 text-justify md:text-center" style={{ lineHeight: '2.2', fontFamily: "'Amiri Quran', serif" }}>
-              "هذه النظرية هي نداء لجميع البشر بمختلف لغاتهم ومعتقداتهم ، للنظر إلى الحقيقة
-              وللنظر إلى جزءٍ بسيط جداً من صفات المنهج الإلهي السليم البعيد عن أيدي
-              التحريف .. وبعد أن ينظروا إلى ذلك ، فإنَّ هذه النظرية هي دعوة لهم لمقارنة مناهجهم مع هذا المنهج السليم وصفاته .. وبعد ذلك فإنَّ هذه النظرية هي نداء لهم لاتباع ما ستختاره عقوُلهم وفطرتهم التي فطرهم الله تعالى عليها ، لأنهم – حين ذلك – سيكونون قد عرفوا الحقيقة."
-            </p>
-            
-            {/* التوقيع */}
-            <div className="flex items-center gap-4 w-full max-w-sm mx-auto">
-              <div className="flex-grow h-[1px] bg-gradient-to-r from-transparent to-[#d4af37]/60"></div>
-              <div className="flex flex-col items-center px-2">
-                <span className="text-[#d4af37] font-bold text-lg tracking-wide whitespace-nowrap">المهندس عدنان الرفاعي</span>
-                <span className="text-slate-400 text-sm mt-1 font-serif">بقلمه</span>
-              </div>
-              <div className="flex-grow h-[1px] bg-gradient-to-l from-transparent to-[#d4af37]/60"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="mt-8 p-6 bg-slate-900/40 border border-white/10 rounded-2xl text-center shadow-lg backdrop-blur-md transition-all hover:border-cyan-500/30">
-    <h4 className="text-sm text-slate-400 mb-2 font-sans">إعداد وتصميم</h4>
-    
-    <p 
-        className="text-2xl font-bold bg-gradient-to-r from-[#d4af37] to-cyan-400 bg-clip-text text-transparent mb-4" 
-        style={{ fontFamily: "'Amiri Quran', serif" }}
-    >
-        أحمد طلعت
-    </p>
-    
-    <a 
-        href="mailto:ahmadalazab2022@gmail.com" 
-        className="inline-flex items-center justify-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 bg-cyan-900/20 px-4 py-2 rounded-xl transition-colors"
-        dir="ltr"
-    >
-        <Mail className="w-4 h-4" />
-        ahmadalazab2022@gmail.com
-    </a>
-</div>
-      {/* 🌟 نهاية القسم الافتتاحي (هنا تبدأ نصوصك القديمة) */}
-               <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-1 h-full bg-[#d4af37]"></div>
-                  <h4 className="text-[#d4af37] font-bold mb-2 text-lg flex items-center"><Search className="w-5 h-5 ml-2"/> فكرة التطبيق</h4>
-                  <p>يهتم هذا التطبيق بعرض واستخراج نماذج <span className="text-white font-bold">الإعجاز العددي في القرآن الكريم</span>، سواء بتعداد الكلمات، أو الحروف، أو عبر استخراج القيم العددية للنصوص القرآنية لكشف التوازنات والروابط الرياضية المذهلة.</p>
-               </div>
-               
-               <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden mt-4">
-                  <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500"></div>
-                  <h4 className="text-indigo-400 font-bold mb-3 text-lg flex items-center"><Book className="w-5 h-5 ml-2"/> نسخة المصحف المعتمدة</h4>
-                  <p className="text-slate-300 text-sm leading-relaxed">
-                     يعتمد هذا التطبيق في إحصاءاته وحساباته حصرياً وبشكل صارم على النص القرآني الموافق لـ <span className="text-white font-bold bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30">مصحف المدينة المنورة (طبعة مجمع الملك فهد)</span>، وذلك وفقاً لـ <span className="text-[#d4af37] font-bold">رواية حفص عن عاصم</span>.
-أي اختلافات طفيفة في أعداد الحروف مقارنة بتطبيقات أخرى تعود إلى الالتزام الدقيق بقواعد الرسم العثماني لهذه النسخة المحددة.
-</p>
-               </div>
-
-               <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-1 h-full bg-cyan-500"></div>
-                  <h4 className="text-cyan-400 font-bold mb-3 text-lg flex items-center"><Calculator className="w-5 h-5 ml-2"/> المعيار القرآني للقيم العددية</h4>
-                  <p className="mb-4">خلافاً للطرق البشرية الوضعية، يعتمد هذا التطبيق على <span className="text-white font-bold">معايير قرآنية بحتة ومجردة</span>.
-حيث تُعطى القيم العددية للحروف بناءً على <span className="text-emerald-400 font-bold">الترتيب التنازلي لمرات ورودها في القرآن الكريم</span>.</p>
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-2 text-center text-xs md:text-sm font-bold" dir="ltr">
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">1</span> ا/أ/إ/ٱ/ء/ى</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">2</span> ل</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">3</span> ن</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">4</span> م</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">5</span> و / ؤ</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center text-[11px] md:text-xs"><span className="text-cyan-400 mb-1 text-sm">6</span> ي / ئ / النبرة</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">7</span> هـ / ة</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">8</span> ر</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">9</span> ب</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">10</span> ك</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">11</span> ت</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">12</span> ع</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">13</span> ف</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">14</span> ق</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">15</span> س</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">16</span> د</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">17</span> ذ</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">18</span> ح</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">19</span> ج</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">20</span> خ</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">21</span> ش</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">22</span> ص</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">23</span> ض</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">24</span> ز</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">25</span> ث</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">26</span> ط</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">27</span> غ</span>
-                    <span className="bg-slate-800/80 rounded-lg p-2 border border-slate-600 text-white shadow-sm flex flex-col justify-center"><span className="text-cyan-400 mb-1">28</span> ظ</span>
+{/* المحتوى مع مساحة أكبر بفضل تقليص الـ padding والـ margin */}
+            <div className="flex-grow overflow-y-auto custom-scrollbar pr-2 space-y-4 text-sm md:text-base leading-relaxed">
+              
+              {/* قسم المحتوى (تم تقليل المسافات) */}
+              <div className={`flex flex-col gap-6 mt-1 mb-4 pb-4 border-b ${t.border}`}> 
+                {/* 1. قسم الآيات القرآنية */}
+                <div className="text-center px-2 md:px-6">
+                  <div className="inline-flex justify-center items-center w-14 h-14 rounded-full neo-out mb-6">
+                    <Book className="w-7 h-7 text-[#b48f27] dark:text-[#d4af37]" />
                   </div>
-               </div>
+                  
+                  <h3 className="text-xl md:text-3xl text-[#b48f27] dark:text-[#d4af37] font-bold text-center mb-6 tracking-wide drop-shadow-sm" style={{ fontFamily: "'Amiri Quran', serif" }}>
+                    بِسۡمِ ٱللَّهِ ٱلرَّحۡمَـٰنِ ٱلرَّحِیمِ
+                  </h3>
 
-               <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-1 h-full bg-rose-500"></div>
-                  <h4 className="text-rose-400 font-bold mb-3 text-lg flex items-center"><Info className="w-5 h-5 ml-2"/> قاعدة الهمزة وحالاتها الدقيقة</h4>
-                  <p className="mb-4 text-sm leading-relaxed">لضمان التطابق التام مع الرسم العثماني للمصحف الشريف، يعتمد التطبيق القواعد الاستثنائية التالية في الحساب:</p>
+                  <p className={`text-lg md:text-2xl ${t.text} leading-[2.2] md:leading-[2.5] font-bold text-center mb-8`} style={{ fontFamily: "'Amiri Quran', serif" }}>
+                    " وَإِذَا سَمِعُوا۟ مَاۤ أُنزِلَ إِلَى ٱلرَّسُولِ تَرَىٰۤ أَعۡیُنَهُمۡ تَفِیضُ مِنَ ٱلدَّمۡعِ مِمَّا عَرَفُوا۟ مِنَ ٱلۡحَقِّۖ یَقُولُونَ رَبَّنَاۤ ءَامَنَّا فَٱكۡتُبۡنَا مَعَ ٱلشَّـٰهِدِینَ (٨٣) وَمَا لَنَا لَا نُؤۡمِنُ بِٱللَّهِ وَمَا جَاۤءَنَا مِنَ ٱلۡحَقِّ وَنَطۡمَعُ أَن یُدۡخِلَنَا رَبُّنَا مَعَ ٱلۡقَوۡمِ ٱلصَّـٰلِحِینَ (٨٤) فَأَثَـٰبَهُمُ ٱللَّهُ بِمَا قَالُوا۟ جَنَّـٰتࣲ تَجۡرِی مِن تَحۡتِهَا ٱلۡأَنۡهَـٰرُ خَـٰلِدِینَ فِیهَاۚ وَذَ ٰ⁠لِكَ جَزَاۤءُ ٱلۡمُحۡسِنِینَ (٨٥) "
+                  </p>
+                  <span className="inline-block px-6 py-2.5 neo-in rounded-xl text-[#b48f27] dark:text-[#d4af37] text-sm font-bold">
+                    [سُورَةُ المَائـِدَةِ: ٨٣-٨٥]
+                  </span>
+                </div>
+
+                {/* 2. بطاقة مقولة المهندس عدنان الرفاعي */}
+                <div className="relative p-6 md:p-10 neo-out rounded-3xl group overflow-hidden mx-auto max-w-5xl">
+                  
+                  <div className="absolute top-0 right-0 p-4 opacity-10 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-700 pointer-events-none">
+                    <Quote className="w-32 h-32 text-[#b48f27] dark:text-[#d4af37]" />
+                  </div>
+
+                  <div className="relative z-10 flex flex-col items-center text-center">
+                    <div className="w-16 h-1 bg-gradient-to-r from-transparent via-[#d4af37] to-transparent rounded-full mb-8"></div>
+                    
+                    <p className={`text-base md:text-xl ${t.text} leading-relaxed font-bold mb-10 text-justify md:text-center`} style={{ lineHeight: '2.2', fontFamily: "'Amiri Quran', serif" }}>
+                      "هذه النظرية هي نداء لجميع البشر بمختلف لغاتهم ومعتقداتهم ، للنظر إلى الحقيقة
+                      وللنظر إلى جزءٍ بسيط جداً من صفات المنهج الإلهي السليم البعيد عن أيدي
+                      التحريف .. وبعد أن ينظروا إلى ذلك ، فإنَّ هذه النظرية هي دعوة لهم لمقارنة مناهجهم مع هذا المنهج السليم وصفاته .. وبعد ذلك فإنَّ هذه النظرية هي نداء لهم لاتباع ما ستختاره عقوُلهم وفطرتهم التي فطرهم الله تعالى عليها ، لأنهم – حين ذلك – سيكونون قد عرفوا الحقيقة."
+                    </p>
+                    
+                    <div className="flex items-center gap-4 w-full max-w-sm mx-auto">
+                      <div className="flex-grow h-[1px] bg-gradient-to-r from-transparent to-[#d4af37]/60"></div>
+                      <div className="flex flex-col items-center px-2">
+                        <span className="text-[#b48f27] dark:text-[#d4af37] font-bold text-lg tracking-wide whitespace-nowrap">المهندس عدنان الرفاعي</span>
+                        <span className={`${t.textMuted} text-sm mt-1 font-serif`}>بقلمه</span>
+                      </div>
+                      <div className="flex-grow h-[1px] bg-gradient-to-l from-transparent to-[#d4af37]/60"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* بطاقة المطور */}
+              <div className="p-6 neo-in rounded-2xl text-center mb-8 border border-cyan-500/10">
+                <h4 className={`text-sm ${t.textMuted} mb-2 font-bold`}>إعداد وتصميم</h4>
+                <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-400 mb-5" style={{ fontFamily: "'Amiri Quran', serif" }}>أحمد طلعت</p>
+                <a href="mailto:ahmadalazab2022@gmail.com" className="inline-flex items-center justify-center gap-2 text-sm text-cyan-700 dark:text-cyan-400 hover:text-cyan-500 neo-out active:neo-in px-5 py-2.5 rounded-xl transition-colors font-bold" dir="ltr">
+                    <Mail className="w-4 h-4" /> ahmadalazab2022@gmail.com
+                </a>
+              </div>
+              
+              {/* 🌟 بطاقات المعلومات الغائرة */}
+              <div className="neo-in p-5 md:p-6 rounded-2xl relative overflow-hidden mt-4">
+                  <div className="absolute top-0 right-0 w-1.5 h-full bg-[#b48f27] dark:bg-[#d4af37]"></div>
+                  <h4 className="text-[#b48f27] dark:text-[#d4af37] font-bold mb-3 text-lg flex items-center"><Search className="w-5 h-5 ml-2"/> فكرة التطبيق</h4>
+                  <p className={`${t.text} leading-loose font-medium`}>يهتم هذا التطبيق بعرض واستخراج نماذج <span className="font-bold text-cyan-700 dark:text-cyan-400">الإعجاز العددي في القرآن الكريم</span>، سواء بتعداد الكلمات، أو الحروف، أو عبر استخراج القيم العددية للنصوص القرآنية لكشف التوازنات والروابط الرياضية المذهلة.</p>
+              </div>
+               
+              <div className="neo-in p-5 md:p-6 rounded-2xl relative overflow-hidden mt-5">
+                  <div className="absolute top-0 right-0 w-1.5 h-full bg-indigo-500"></div>
+                  <h4 className="text-indigo-600 dark:text-indigo-400 font-bold mb-3 text-lg flex items-center"><Book className="w-5 h-5 ml-2"/> نسخة المصحف المعتمدة</h4>
+                  <p className={`${t.text} leading-loose font-medium`}>
+                     يعتمد هذا التطبيق في إحصاءاته وحساباته حصرياً وبشكل صارم على النص القرآني الموافق لـ <span className="font-bold text-indigo-600 dark:text-indigo-400">مصحف المدينة المنورة (طبعة مجمع الملك فهد)</span>، وذلك وفقاً لـ <span className="font-bold text-[#b48f27] dark:text-[#d4af37]">رواية حفص عن عاصم</span>.
+  أي اختلافات طفيفة في أعداد الحروف مقارنة بتطبيقات أخرى تعود إلى الالتزام الدقيق بقواعد الرسم العثماني لهذه النسخة المحددة.
+  </p>
+              </div>
+
+              <div className="neo-in p-5 md:p-6 rounded-2xl relative overflow-hidden mt-5">
+                  <div className="absolute top-0 right-0 w-1.5 h-full bg-cyan-500"></div>
+                  <h4 className="text-cyan-700 dark:text-cyan-400 font-bold mb-4 text-lg flex items-center"><Calculator className="w-5 h-5 ml-2"/> المعيار القرآني للقيم العددية</h4>
+                  <p className={`${t.text} leading-loose font-medium mb-6`}>خلافاً للطرق البشرية الوضعية، يعتمد هذا التطبيق على <span className="font-bold text-cyan-700 dark:text-cyan-400">معايير قرآنية بحتة ومجردة</span>.
+  حيث تُعطى القيم العددية للحروف بناءً على <span className="font-bold text-emerald-600 dark:text-emerald-400">الترتيب التنازلي لمرات ورودها في القرآن الكريم</span>.</p>
+                  
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 text-center text-xs md:text-sm font-bold" dir="ltr">
+                    {[
+                      { v: 1, l: 'ا/أ/إ/ٱ/ء/ى' }, { v: 2, l: 'ل' }, { v: 3, l: 'ن' }, { v: 4, l: 'م' }, { v: 5, l: 'و / ؤ' }, { v: 6, l: 'ي / ئ' }, { v: 7, l: 'هـ / ة' },
+                      { v: 8, l: 'ر' }, { v: 9, l: 'ب' }, { v: 10, l: 'ك' }, { v: 11, l: 'ت' }, { v: 12, l: 'ع' }, { v: 13, l: 'ف' }, { v: 14, l: 'ق' },
+                      { v: 15, l: 'س' }, { v: 16, l: 'د' }, { v: 17, l: 'ذ' }, { v: 18, l: 'ح' }, { v: 19, l: 'ج' }, { v: 20, l: 'خ' }, { v: 21, l: 'ش' },
+                      { v: 22, l: 'ص' }, { v: 23, l: 'ض' }, { v: 24, l: 'ز' }, { v: 25, l: 'ث' }, { v: 26, l: 'ط' }, { v: 27, l: 'غ' }, { v: 28, l: 'ظ' }
+                    ].map(item => (
+                      <div key={item.v} className={`neo-out rounded-xl p-2.5 flex flex-col justify-center items-center shadow-sm`}>
+                        <span className="text-cyan-600 dark:text-cyan-400 mb-1 text-sm">{item.v}</span>
+                        <span className={`${t.text}`}>{item.l}</span>
+                      </div>
+                    ))}
+                  </div>
+              </div>
+
+              <div className="neo-in p-5 md:p-6 rounded-2xl relative overflow-hidden mt-5">
+                  <div className="absolute top-0 right-0 w-1.5 h-full bg-rose-500"></div>
+                  <h4 className="text-rose-600 dark:text-rose-400 font-bold mb-4 text-lg flex items-center"><Info className="w-5 h-5 ml-2"/> قاعدة الهمزة وحالاتها الدقيقة</h4>
+                  <p className={`${t.text} leading-loose font-medium mb-5`}>لضمان التطابق التام مع الرسم العثماني للمصحف الشريف، يعتمد التطبيق القواعد الاستثنائية التالية في الحساب:</p>
                   <div className="space-y-4">
-                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <h5 className="text-[#d4af37] font-bold text-sm mb-2">1. الهمزة المحمولة (ذات الكرسي):</h5>
-                        <p className="text-slate-300 text-sm">تُحسب بناءً على الحرف الحامل لها وتُعتبر حرفاً أصيلاً يأخذ قيمة الكرسي (أ، إ، ؤ، ئ، والهمزة تحت النبرة).</p>
+                     <div className="neo-out p-5 rounded-2xl">
+                        <h5 className="text-[#b48f27] dark:text-[#d4af37] font-bold text-base mb-2">1. الهمزة المحمولة (ذات الكرسي):</h5>
+                        <p className={`${t.textMuted} font-medium`}>تُحسب بناءً على الحرف الحامل لها وتُعتبر حرفاً أصيلاً يأخذ قيمة الكرسي (أ، إ، ؤ، ئ، والهمزة تحت النبرة).</p>
                      </div>
-                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                        <h5 className="text-[#d4af37] font-bold text-sm mb-2">2. الهمزة المفردة (على السطر):</h5>
-                        <p className="text-slate-300 text-sm mb-3">هناك أمثلة وحالات كثيرة لا تُعتبر فيها الهمزة المفردة (ء) حرفاً أصيلاً، بل مجرد علامة ضبط تُتجاهل برمجياً في الحساب، وتشمل:</p>
-                        <ul className="list-none space-y-3 text-slate-300 text-sm">
-                           <li className="flex items-start"><span className="text-rose-400 ml-2 mt-1">•</span><div><strong className="text-white">في وسط الكلمة (بدون نبرة):</strong><br/><span className="text-slate-400 text-xs">أمثلة: (السيءات، يجءرون، تجءروا، الءن، هنيءا، مريءا، متكءين، يتكءون، أفءدتهم، أفءدة، يستءخرون، خطيءة، خطءا، خطيءتهم، ليسءوا، فمالءون، المشءمة).</span></div></li>
-                           <li className="flex items-start"><span className="text-rose-400 ml-2 mt-1">•</span><div><strong className="text-white">في بداية الكلمة (على السطر):</strong><br/><span className="text-slate-400 text-xs">أمثلة: (ءامن، ءامنوا، ءامنا، ءادم، قرءان، القرءان، ءاخر، ءاخرين، ءاخرنا).
-وتتميز بأنها تسقط عند دخول حرف ملتصق بالكلمة لأنها ليست حرفاً أصيلاً.</span></div></li>
-                           <li className="flex items-start"><span className="text-rose-400 ml-2 mt-1">•</span><div><strong className="text-white">في نهاية الكلمة:</strong><br/><span className="text-slate-400 text-xs">أمثلة: (شيء، بريء، الخبء، دفء).
-والسبب أنه بدخول حرف على نهاية الكلمة (التنوين) يسقط الكرسي وتكتب بدون نبرة مثل: (شيءا، بريءا).</span></div></li>
+                     <div className="neo-out p-5 rounded-2xl">
+                        <h5 className="text-[#b48f27] dark:text-[#d4af37] font-bold text-base mb-3">2. الهمزة المفردة (على السطر):</h5>
+                        <p className={`${t.textMuted} font-medium mb-4`}>هناك أمثلة وحالات كثيرة لا تُعتبر فيها الهمزة المفردة (ء) حرفاً أصيلاً، بل مجرد علامة ضبط تُتجاهل برمجياً في الحساب، وتشمل:</p>
+                        <ul className="space-y-4">
+                           <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في وسط الكلمة (بدون نبرة):</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (السيءات، يجءرون، تجءروا، الءن، هنيءا، مريءا، متكءين، يتكءون، أفءدتهم، أفءدة، يستءخرون، خطيءة، خطءا، خطيءتهم، ليسءوا، فمالءون، المشءمة).</span></div></li>
+                           <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في بداية الكلمة (على السطر):</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (ءامن، ءامنوا، ءامنا، ءادم، قرءان، القرءان، ءاخر، ءاخرين، ءاخرنا). وتتميز بأنها تسقط عند دخول حرف ملتصق بالكلمة لأنها ليست حرفاً أصيلاً.</span></div></li>
+                           <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في نهاية الكلمة:</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (شيء، بريء، الخبء، دفء). والسبب أنه بدخول حرف على نهاية الكلمة (التنوين) يسقط الكرسي وتكتب بدون نبرة مثل: (شيءا، بريءا).</span></div></li>
                         </ul>
                      </div>
                   </div>
-               </div>
+              </div>
 
-               <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 relative overflow-hidden mt-4">
-                  <div className="absolute top-0 right-0 w-1 h-full bg-[#d4af37]"></div>
-                  <h4 className="text-white font-bold mb-3 text-lg">تنويه ورد الفضل لأهله</h4>
-                  <p className="text-slate-400 text-sm leading-relaxed mb-5">
-                     إن امتلاء القرآن الكريم بآلاف النماذج من هذه الروابط المذهلة، هو دلالة يقينية ورياضية قاطعة على <span className="text-cyan-400 font-bold">عدم تغيير أي حرف من القرآن</span> (لا بالزيادة ولا بالنقصان)، وإلا لاختلت وانهارت كل هذه المنظومة الرقمية العظيمة.
-</p>
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-[#d4af37]/30 inline-block text-right w-full">
-                     <p className="text-slate-300 text-sm leading-relaxed">
-                        <span className="text-[#d4af37] font-bold">شكر وتقدير: </span> 
-                        تعود أصول هذه النظرية ومنهجية الحساب المعجزة، واستنباط الأمثلة المذكورة في هذه المنظومة إلى الأبحاث والدراسات المعمقة التي قدمها <span className="text-white font-bold px-1 text-base">المهندس / عدنان الرفاعي</span>.
-نسأل الله أن يجعل هذا العمل الجليل في ميزان حسناته وأن ينفع به.
-</p>
+              <div className="neo-in p-5 md:p-6 rounded-2xl relative overflow-hidden mt-5 mb-4">
+                  <div className="absolute top-0 right-0 w-1.5 h-full bg-[#b48f27] dark:bg-[#d4af37]"></div>
+                  <h4 className={`${t.text} font-bold mb-4 text-lg`}>تنويه ورد الفضل لأهله</h4>
+                  <p className={`${t.textMuted} leading-relaxed font-medium mb-6`}>
+                     إن امتلاء القرآن الكريم بآلاف النماذج من هذه الروابط المذهلة، هو دلالة يقينية ورياضية قاطعة على <span className="text-cyan-700 dark:text-cyan-400 font-bold">عدم تغيير أي حرف من القرآن</span> (لا بالزيادة ولا بالنقصان)، وإلا لاختلت وانهارت كل هذه المنظومة الرقمية العظيمة.
+                  </p>
+                  <div className="neo-out p-5 rounded-2xl border border-[#d4af37]/20 text-right w-full">
+                     <p className={`${t.textMuted} leading-relaxed font-medium`}>
+                        <span className="text-[#b48f27] dark:text-[#d4af37] font-bold text-lg block mb-2">شكر وتقدير: </span> 
+                        تعود أصول هذه النظرية ومنهجية الحساب المعجزة، واستنباط الأمثلة المذكورة في هذه المنظومة إلى الأبحاث والدراسات المعمقة التي قدمها <span className={`${t.text} font-bold px-1 text-base`}>المهندس / عدنان الرفاعي</span>.
+  نسأل الله أن يجعل هذا العمل الجليل في ميزان حسناته وأن ينفع به.
+  </p>
                   </div>
-               </div>
+              </div>
             </div>
             
-            <div className="mt-6 flex justify-end">
-               <button onClick={() => setIsMethodologyModalOpen(false)} className="px-8 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all shadow-md">اكتشف الآن</button>
+            <div className="mt-6 pt-4 border-t border-black/5 dark:border-white/5 flex justify-end shrink-0">
+               <button onClick={() => setIsMethodologyModalOpen(false)} className="px-8 py-3 rounded-xl neo-out active:neo-in font-bold transition-all text-cyan-700 dark:text-cyan-400">اكتشف الآن</button>
             </div>
           </div>
         </div>
-        
       )}
       
-      {/* -------------------- شريط القائمة الرئيسي (يظهر فقط في شاشة المصحف) -------------------- */}
+{/* -------------------- شريط القائمة الرئيسي (يظهر فقط في شاشة المصحف) -------------------- */}
       {activeTab === 'main' && (
-        <div className={`sticky top-0 z-40 ${t.headerBg} backdrop-blur-xl border-b ${t.border} px-4 md:px-8 py-2 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 transition-colors duration-300`}>
-           <div className="text-center md:text-right flex items-center gap-4">
+        <div className={`sticky top-0 z-40 neo-out border-t-0 rounded-b-3xl px-3 md:px-6 py-1.5 md:py-2 flex flex-col md:flex-row justify-between items-center gap-2 md:gap-3 transition-all duration-300`}>
+           <div className="text-center md:text-right flex items-center gap-3">
               <div>
-                 <h1 className="text-2xl font-bold ">
-   الرَّقِيم <span className="text-sm text-cyan-400 font-normal">منظومة الأعداد في القرآن الكريم</span>
-</h1>
-                 <p className={`${t.textMuted} text-[10px] md:text-xs flex items-center mt-1`}>
+                 {/* 🌟 تم استخدام {t.text} لضمان التغير الجذري للون الرقيم مع زر التطبيق */}
+                 <h1 className={`text-xl md:text-2xl font-bold ${t.text}`}>
+                   الرَّقِيم <span className="text-xs md:text-sm text-cyan-600 dark:text-cyan-400 font-normal">منظومة الأعداد في القرآن الكريم</span>
+                 </h1>
+                 <p className={`text-slate-500 dark:text-slate-400 text-[9px] md:text-[11px] flex items-center mt-0.5 font-bold`}>
                    {selectedWords.size > 0 || selectedAyahs.size > 0 ? <><AlertCircle className="w-3 h-3 text-cyan-500 ml-1"/> البحث: يدوي</> : <><BookOpen className="w-3 h-3 text-[#d4af37] ml-1"/> البحث: كامل الصفحة</>}
                  </p>
               </div>
-              <button onClick={() => setIsFullIndexOpen(true)} className={`${t.btn} ${t.btnHover} p-2.5 rounded-xl transition-all shadow-sm`} title="الفهرس الشامل">
-  <LayoutGrid className="w-5 h-5 text-indigo-500" />
-</button>
-              <button onClick={() => setIsSurahModalOpen(true)} className={`${t.btn} ${t.btnHover} text-sm rounded-xl px-5 py-2.5 transition-colors font-bold shadow-sm flex items-center`}>
-                <span className="font-bold text-lg pt-1" style={{ fontFamily: "'Amiri Quran', serif" }}>سورة {currentSurah.name}</span>
-                <span className={`text-xs ${t.textMuted} mr-2 font-sans`}>({currentSurah.total_ayahs} آية)</span>
+              <button onClick={() => setIsFullIndexOpen(true)} className={`neo-out active:neo-in text-indigo-600 dark:text-indigo-400 p-2 md:p-2.5 rounded-xl transition-all`} title="الفهرس الشامل">
+                <LayoutGrid className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              <button onClick={() => setIsSurahModalOpen(true)} className={`neo-out active:neo-in rounded-xl px-3 py-1.5 md:px-4 md:py-2 transition-all flex items-center`}>
+                {/* 🌟 تم استخدام {t.text} هنا أيضاً لاسم السورة */}
+                <span className={`font-bold text-base md:text-lg pt-1 ${t.text}`} style={{ fontFamily: "'Amiri Quran', serif" }}>سورة {currentSurah.name}</span>
+                <span className={`text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mr-2 font-sans`}>({currentSurah.total_ayahs} آية)</span>
               </button>
            </div>
            
            <div className="flex items-center flex-wrap justify-center gap-2">
-             <button onClick={() => setIsDarkMode(!isDarkMode)} className={`${t.btn} ${t.btnHover} p-2.5 rounded-xl transition-all shadow-sm`} title="تغيير المظهر">
-                 {isDarkMode ? <Sun className="w-5 h-5 text-[#d4af37]" /> : <Moon className="w-5 h-5 text-indigo-600" />}
+             <button onClick={() => setIsDarkMode(!isDarkMode)} className={`neo-out active:neo-in p-2 md:p-2.5 rounded-xl transition-all`} title="تغيير المظهر">
+                 {isDarkMode ? <Sun className="w-4 h-4 md:w-5 md:h-5 text-[#d4af37]" /> : <Moon className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" />}
              </button>
-             <button onClick={() => setIsMethodologyModalOpen(true)} className={`${t.btn} ${t.btnHover} px-3 py-2 md:px-4 md:py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-sm`}>
-                <Info className="w-4 h-4 text-cyan-500" /> <span className="hidden md:inline">عن التطبيق</span>
+             <button onClick={() => setIsMethodologyModalOpen(true)} className={`neo-out active:neo-in text-cyan-600 dark:text-cyan-400 px-3 py-1.5 md:px-3 md:py-2 rounded-xl flex items-center gap-1.5 text-sm md:text-base font-bold transition-all`}>
+                <Info className="w-4 h-4" /> <span className="hidden md:inline">عن التطبيق</span>
              </button>
-             <button onClick={() => setIsGlobalSearchModalOpen(true)} className={`${t.btn} ${t.btnHover} px-3 py-2 md:px-4 md:py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-sm`}>
-                <Search className="w-4 h-4 text-cyan-500" /> <span className="hidden md:inline">بحث</span>
+             <button onClick={() => setIsGlobalSearchModalOpen(true)} className={`neo-out active:neo-in text-cyan-600 dark:text-cyan-400 px-3 py-1.5 md:px-3 md:py-2 rounded-xl flex items-center gap-1.5 text-sm md:text-base font-bold transition-all`}>
+                <Search className="w-4 h-4" /> <span className="hidden md:inline">بحث</span>
              </button>
-             <button onClick={() => setActiveTab('encyclopedia')} className={`${t.btn} ${t.btnHover} px-3 py-2 md:px-4 md:py-2.5 rounded-xl flex items-center gap-2 font-bold transition-all shadow-sm`}>
-                <Library className="w-4 h-4 text-[#d4af37]" /> <span className="hidden md:inline">الموسوعة</span>
+             <button onClick={() => setActiveTab('encyclopedia')} className={`neo-out active:neo-in text-[#d4af37] px-3 py-1.5 md:px-3 md:py-2 rounded-xl flex items-center gap-1.5 text-sm md:text-base font-bold transition-all`}>
+                <Library className="w-4 h-4" /> <span className="hidden md:inline">الموسوعة</span>
               </button>
            </div>
         </div>
       )}
+
 {/* 🌟 الشريط الفرعي لنتائج البحث (يظهر فقط إذا كان هناك بحث نشط وفي شاشة المصحف) */}
         {hasActiveSearch && activeTab === 'main' && (
             <div className={`w-full bg-cyan-900/95 backdrop-blur-md text-white px-4 md:px-8 py-2.5 flex justify-between items-center text-xs md:text-sm border-b border-cyan-700/50 sticky top-[72px] z-30 shadow-sm`}>
@@ -1441,32 +1547,66 @@ const handleAddToStash = () => {
         {activeTab === 'main' && (
           <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 relative z-10 animate-fade-in-up">
             
-            {/* أزرار الصفحات العلوية */}
-            {totalPages > 1 && (
-               <div className={`flex justify-center items-center gap-4 ${t.panel} p-3 rounded-2xl border ${t.border} w-fit mx-auto shadow-sm`}>
-                 <button onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); clearSelection(); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} disabled={currentPage === 1} className={`${t.input} p-2 rounded-lg ${t.text} ${t.btnHover} disabled:opacity-30 border ${t.borderFocus}`}><ChevronRight className="w-5 h-5"/></button>
-                 <span className={`text-sm font-bold ${t.textMuted}`}>صفحة {currentPage} من {totalPages}</span>
-                 <button onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); clearSelection(); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} disabled={currentPage === totalPages} className={`${t.input} p-2 rounded-lg ${t.text} ${t.btnHover} disabled:opacity-30 border ${t.borderFocus}`}><ChevronLeft className="w-5 h-5"/></button>
-               </div>
-            )}
+{/* 🌟 شريط التنقل بين الصفحات (بتصميم النيومورفيزم) */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center py-6 md:py-8 w-full">
+              {/* الغلاف الخارجي للشريط */}
+              <div className="neo-out p-1.5 md:p-2 rounded-2xl flex items-center gap-2 md:gap-4 mx-auto">
+                
+                {/* زر الصفحة السابقة */}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className={`p-2.5 md:p-3 rounded-xl transition-all flex items-center justify-center ${
+                    currentPage === 1 
+                      ? 'opacity-40 cursor-not-allowed text-slate-400 dark:text-slate-500 neo-in' 
+                      : 'neo-out active:neo-in text-cyan-700 dark:text-cyan-400 hover:text-cyan-500'
+                  }`}
+                >
+                  <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
 
-            {/* لوحة الإحصاء اليدوي */}
+                {/* مؤشر رقم الصفحة (غائر للداخل) */}
+                <div className="neo-in px-6 md:px-10 py-2 md:py-2.5 rounded-xl min-w-[130px] flex justify-center items-center">
+                  <span className={`font-bold text-sm md:text-base ${t.text}`}>
+                    صفحة {currentPage} من {totalPages}
+                  </span>
+                </div>
+
+                {/* زر الصفحة التالية */}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className={`p-2.5 md:p-3 rounded-xl transition-all flex items-center justify-center ${
+                    currentPage === totalPages 
+                      ? 'opacity-40 cursor-not-allowed text-slate-400 dark:text-slate-500 neo-in' 
+                      : 'neo-out active:neo-in text-cyan-700 dark:text-cyan-400 hover:text-cyan-500'
+                  }`}
+                >
+                  <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
+                </button>
+                
+              </div>
+            </div>
+          )}
+
+{/* لوحة الإحصاء اليدوي */}
             {statsData && discoveries.length === 0 && (
-               <div id="results-panel" className={`${t.panel} border ${t.borderFocus} rounded-2xl p-5 shadow-lg animate-fade-in-up`}>
-                  <div className={`flex justify-between items-center mb-4 border-b ${t.border} pb-3`}>
-                   <h3 className={`font-bold ${t.text} flex items-center`}><BarChart3 className="w-5 h-5 ml-2 text-[#d4af37]"/> إحصاء النص</h3>
-                   <button onClick={() => { setStatsData(null); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text}`}><X className="w-5 h-5"/></button>
+               <div id="results-panel" className={`neo-out rounded-3xl p-6 mb-8 animate-fade-in-up`}>
+                  <div className={`flex justify-between items-center mb-6 border-b ${t.border} pb-4`}>
+                   <h3 className={`font-bold ${t.text} text-xl flex items-center`}><BarChart3 className="w-6 h-6 ml-2 text-[#d4af37]"/> إحصاء النص</h3>
+                   <button onClick={() => { setStatsData(null); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text} neo-out rounded-full p-2`}><X className="w-5 h-5"/></button>
                  </div>
-                 <div className="grid grid-cols-3 gap-3 mb-6">
-                    <div className={`${t.input} p-4 rounded-xl text-center border ${t.borderFocus}`}><p className={`${t.textMuted} text-xs mb-1`}>الكلمات</p><p className={`text-xl md:text-2xl font-bold ${t.text}`}>{statsData.words}</p></div>
-                    <div className={`${t.input} p-4 rounded-xl text-center border ${statsData.is19Letters ? 'border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.2)]' : t.borderFocus}`}><p className={`${t.textMuted} text-xs mb-1`}>الحروف</p><p className={`text-xl md:text-2xl font-bold ${statsData.is19Letters ? 'text-[#d4af37]' : t.text}`}>{statsData.letters}</p>{statsData.is19Letters && <span className="text-[10px] font-bold text-[#d4af37] block mt-1 bg-[#d4af37]/10 rounded-md py-0.5">19 × {statsData.letters/19}</span>}</div>
-                    <div className={`${t.input} p-4 rounded-xl text-center border ${statsData.is19Value ? 'border-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.2)]' : t.borderFocus}`}><p className={`${t.textMuted} text-xs mb-1`}>القيمة</p><p className={`text-xl md:text-2xl font-bold ${statsData.is19Value ? 'text-[#d4af37]' : t.text}`}>{statsData.value}</p>{statsData.is19Value && <span className="text-[10px] font-bold text-[#d4af37] block mt-1 bg-[#d4af37]/10 rounded-md py-0.5">19 × {statsData.value/19}</span>}</div>
+                 <div className="grid grid-cols-3 gap-4 mb-8">
+                    <div className={`neo-in p-5 rounded-2xl text-center`}><p className={`${t.textMuted} text-sm mb-2 font-bold`}>الكلمات</p><p className={`text-3xl font-black ${t.text}`}>{statsData.words}</p></div>
+                    <div className={`neo-in p-5 rounded-2xl text-center ${statsData.is19Letters ? 'border border-[#d4af37]/50' : ''}`}><p className={`${t.textMuted} text-sm mb-2 font-bold`}>الحروف</p><p className={`text-3xl font-black ${statsData.is19Letters ? 'text-[#d4af37]' : t.text}`}>{statsData.letters}</p>{statsData.is19Letters && <span className="text-[11px] font-bold text-[#d4af37] block mt-2 bg-[#d4af37]/10 rounded-md py-1">19 × {statsData.letters/19}</span>}</div>
+                    <div className={`neo-in p-5 rounded-2xl text-center ${statsData.is19Value ? 'border border-[#d4af37]/50' : ''}`}><p className={`${t.textMuted} text-sm mb-2 font-bold`}>القيمة العددية</p><p className={`text-3xl font-black ${statsData.is19Value ? 'text-[#d4af37]' : t.text}`}>{statsData.value}</p>{statsData.is19Value && <span className="text-[11px] font-bold text-[#d4af37] block mt-2 bg-[#d4af37]/10 rounded-md py-1">19 × {statsData.value/19}</span>}</div>
                  </div>
-                 <div className="flex flex-col md:flex-row gap-3">
+                 <div className="flex flex-col md:flex-row gap-4">
                    {(statsData.is19Letters || statsData.is19Value) && (
-                     <button onClick={() => openCommentModal()} className="flex-1 bg-[#d4af37] hover:bg-[#b48f27] text-white font-bold py-3 rounded-xl flex justify-center items-center shadow-md"><BookmarkPlus className="w-5 h-5 ml-2" /> حفظ الإعجاز</button>
+                     <button onClick={() => openCommentModal()} className="flex-1 bg-[#d4af37] hover:bg-[#b48f27] text-white font-bold py-3.5 rounded-2xl flex justify-center items-center shadow-lg transition-colors"><BookmarkPlus className="w-5 h-5 ml-2" /> حفظ الإعجاز</button>
                    )}
-                   <button onClick={openDeepSearchConfig} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl flex justify-center items-center transition-colors shadow-md">
+                   <button onClick={openDeepSearchConfig} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center transition-colors shadow-lg">
                      <Search className="w-5 h-5 ml-2" /> بحث عن متطابقات (±3 صفحات)
                    </button>
                  </div>
@@ -1581,10 +1721,11 @@ const handleAddToStash = () => {
                       if (!fw) return <span key={index}>{word} </span>;
                       
                       const isWordSelected = selectedWords.has(fw.wordId) || selectedAyahs.has(ayah.number);
-                      let segmentIndex = -1; let isStartOfSegment = false; let isEndOfSegment = false; 
+let segmentIndex = -1; let isStartOfSegment = false; let isEndOfSegment = false; 
                       let wordColorClass = ""; 
 
                       if (discoveries.length > 0) {
+                        // حالة التمشيط والاكتشاف (تأخذ الألوان المخصصة للاكتشافات)
                         const activeSegments = discoveries[activeDiscoveryIndex].segments;
                         segmentIndex = activeSegments.findIndex(seg => fw.flatIndex >= seg.startIndex && fw.flatIndex <= seg.endIndex);
                         if (segmentIndex !== -1) { 
@@ -1592,11 +1733,9 @@ const handleAddToStash = () => {
                            isEndOfSegment = fw.flatIndex === activeSegments[segmentIndex].endIndex; 
                         } 
                         else { wordColorClass = t.quranInactive; }
-                      } else if (statsData) {
-                         const seg = statsData.segments[0];
-                         if (fw.flatIndex >= seg.startIndex && fw.flatIndex <= seg.endIndex) { segmentIndex = 0; isStartOfSegment = fw.flatIndex === seg.startIndex; isEndOfSegment = fw.flatIndex === seg.endIndex; } 
-                         else { wordColorClass = t.quranInactive; }
-                      } else if (selectedWords.size > 0 || selectedAyahs.size > 0) {
+                      } else if (statsData || selectedWords.size > 0 || selectedAyahs.size > 0) {
+                         // 🌟 دمجنا حالة "إحصاء النص" مع التحديد العادي
+                         // لكي يحتفظ النص المحدد بنفس التنسيق الجميل والواضح ولا يتغير لونه أبداً
                          if (!isWordSelected) wordColorClass = t.quranInactive;
                       }
 
@@ -1624,6 +1763,7 @@ const handleAddToStash = () => {
      : 'bg-[#d1e7dd] text-[#0f5132] rounded-lg border-b-2 border-[#badbcc] ';
 }
                       else if (selectionMode === 'word' && discoveries.length === 0 && !statsData) { styleClasses += 'cursor-pointer rounded-lg hover:text-[#d4af37]'; }
+                    
                       
                       return (
                         <span key={index} data-wordid={fw.wordId} onMouseDown={() => handleDragStart(fw.wordId)} onMouseEnter={() => handleDragEnter(fw.wordId)} onTouchStart={() => handleDragStart(fw.wordId)} onClick={() => handleWordClick(fw.wordId)} className={`${styleClasses} ${wordColorClass || t.quranText} ${wordColorClass === '' ? 'relative z-10 ' : ''}`}>
@@ -1651,53 +1791,96 @@ const handleAddToStash = () => {
               })}
             </div>
 
-            {/* أزرار الصفحات السفلية */}
+{/* 🌟 أزرار الصفحات السفلية (بتصميم النيومورفيزم مع الحفاظ على خاصية الصعود للأعلى) */}
             {totalPages > 1 && (
-               <div className={`flex justify-center items-center gap-4 ${t.panel} p-3 rounded-2xl border ${t.border} w-fit mx-auto mt-6 shadow-sm`}>
-                 <button onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} disabled={currentPage === 1} className={`${t.input} p-2 rounded-lg ${t.text} ${t.btnHover} disabled:opacity-30 border ${t.borderFocus}`}><ChevronRight className="w-5 h-5"/></button>
-                 <span className={`text-sm font-bold ${t.textMuted}`}>صفحة {currentPage} من {totalPages}</span>
-                 <button onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); document.getElementById('main-scroll-container')?.scrollTo({top: 0}); }} disabled={currentPage === totalPages} className={`${t.input} p-2 rounded-lg ${t.text} ${t.btnHover} disabled:opacity-30 border ${t.borderFocus}`}><ChevronLeft className="w-5 h-5"/></button>
+               <div className="flex justify-center items-center mt-8 w-full">
+                  {/* الغلاف الخارجي للشريط السفلي بالنيومورفيزم */}
+                  <div className="neo-out p-1.5 md:p-2 rounded-2xl flex items-center gap-2 md:gap-4 mx-auto w-fit">
+                     
+                     {/* زر الصفحة السابقة */}
+                     <button 
+                       onClick={() => { 
+                          setCurrentPage(prev => Math.max(prev - 1, 1)); 
+                          // 🌟 الحفاظ على خاصية الصعود للأعلى عند تقليب الصفحات
+                          document.getElementById('main-scroll-container')?.scrollTo({top: 0}); 
+                       }} 
+                       disabled={currentPage === 1} 
+                       className={`p-2.5 md:p-3 rounded-xl transition-all flex items-center justify-center ${
+                          currentPage === 1 
+                            ? 'opacity-40 cursor-not-allowed text-slate-400 dark:text-slate-500 neo-in' 
+                            : 'neo-out active:neo-in text-cyan-700 dark:text-cyan-400 hover:text-cyan-500'
+                       }`}
+                     >
+                        <ChevronRight className="w-5 h-5 md:w-6 md:h-6"/>
+                     </button>
+
+                     {/* مؤشر رقم الصفحة الغائر للداخل */}
+                     <div className="neo-in px-6 md:px-10 py-2 md:py-2.5 rounded-xl min-w-[130px] flex justify-center items-center">
+                        <span className={`font-bold text-sm md:text-base ${t.text}`}>
+                          صفحة {currentPage} من {totalPages}
+                        </span>
+                     </div>
+
+                     {/* زر الصفحة التالية */}
+                     <button 
+                       onClick={() => { 
+                          setCurrentPage(prev => Math.min(prev + 1, totalPages)); 
+                          // 🌟 الحفاظ على خاصية الصعود للأعلى عند تقليب الصفحات
+                          document.getElementById('main-scroll-container')?.scrollTo({top: 0}); 
+                       }} 
+                       disabled={currentPage === totalPages} 
+                       className={`p-2.5 md:p-3 rounded-xl transition-all flex items-center justify-center ${
+                          currentPage === totalPages 
+                            ? 'opacity-40 cursor-not-allowed text-slate-400 dark:text-slate-500 neo-in' 
+                            : 'neo-out active:neo-in text-cyan-700 dark:text-cyan-400 hover:text-cyan-500'
+                       }`}
+                     >
+                        <ChevronLeft className="w-5 h-5 md:w-6 md:h-6"/>
+                     </button>
+                     
+                  </div>
                </div>
             )}
           </div>
         )}
 
-        {/* -------------------- الشاشة 2: موسوعة الإعجاز -------------------- */}
+{/* -------------------- الشاشة 2: موسوعة الإعجاز (بتصميم النيومورفيزم) -------------------- */}
         {activeTab === 'encyclopedia' && (
           <div className="flex flex-col min-h-full animate-fade-in-up">
-             {/* شريط علوي خاص بالموسوعة - يحل محل الرئيسي */}
+{/* 🌟 الشريط العلوي للموسوعة (تم إزالة الهوامش الجانبية وتوحيد التصميم مع الشاشة الرئيسية) */}
              {!activeEncycCategory ? (
-                 <div className={`sticky top-0 z-40 ${t.headerBg} backdrop-blur-xl border-b ${t.border} px-4 md:px-8 py-4 shadow-sm flex justify-between items-center transition-all duration-300`}>
-                   <div>
+                 <div className={`sticky top-0 z-40 neo-out border-t-0 rounded-b-3xl px-4 md:px-8 py-3 md:py-4 flex flex-col md:flex-row justify-between items-center gap-3 transition-all duration-300`}>
+                   <div className="text-center md:text-right">
                      <h2 className={`text-2xl md:text-3xl font-black ${t.text} tracking-wide`}>
-                       <span className="text-[#d4af37]">موسوعة</span> الإعجاز
+                       <span className="text-[#b48f27] dark:text-[#d4af37]">موسوعة</span> الإعجاز
                      </h2>
-                     <p className={`${t.textMuted} text-xs md:text-sm mt-1`}>نماذج وأمثلة مختارة من كنوز المنظومة  الرقمية ....."للإطلاع على كل الأمثلة يرجى العودة لكتب المهندس عدنان الرفاعي".</p>
+                     <p className={`${t.textMuted} text-[10px] md:text-xs mt-1 font-bold`}>نماذج وأمثلة مختارة من كنوز المنظومة الرقمية ....."للاطلاع على كل الأمثلة يرجى العودة لكتب المهندس عدنان الرفاعي".</p>
                    </div>
-                   <button onClick={() => setActiveTab('main')} className={`flex items-center ${t.btn} ${t.btnHover} font-bold px-4 md:px-5 py-2.5 rounded-xl transition-all shadow-sm`}>
+                   <button onClick={() => setActiveTab('main')} className={`flex items-center neo-out active:neo-in font-bold px-4 md:px-5 py-2.5 rounded-xl transition-all ${t.text} hover:text-cyan-700 dark:hover:text-cyan-400`}>
                      <ArrowLeft className="mr-2 w-4 h-4 rotate-180" /> <span className="hidden md:inline">العودة للمصحف</span>
                    </button>
                  </div>
              ) : (
-                 <div className={`sticky top-0 z-40 ${t.headerBg} backdrop-blur-xl border-b ${t.border} px-4 md:px-8 py-4 shadow-sm flex justify-between items-center transition-all duration-300`}>
+                 <div className={`sticky top-0 z-40 neo-out border-t-0 rounded-b-3xl px-4 md:px-8 py-3 flex justify-between items-center transition-all duration-300`}>
                     <div className="flex items-center gap-3 md:gap-4">
-                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center ${activeEncycCategory.bg}`}>
+                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center neo-in`}>
                         <activeEncycCategory.icon className={`w-5 h-5 md:w-6 md:h-6 ${activeEncycCategory.color}`} />
                       </div>
                       <div>
                         <h2 className={`text-xl md:text-2xl font-bold ${t.text} line-clamp-1`}>{activeEncycCategory.title}</h2>
                       </div>
                     </div>
-                    <button onClick={() => setActiveEncycCategory(null)} className={`flex items-center ${t.btn} ${t.btnHover} font-bold px-3 py-2 md:px-4 md:py-2.5 rounded-xl transition-all shadow-sm text-sm md:text-base`}>
+                    <button onClick={() => setActiveEncycCategory(null)} className={`flex items-center neo-out active:neo-in font-bold px-3 py-2 md:px-4 md:py-2.5 rounded-xl transition-all text-sm md:text-base ${t.text} hover:text-cyan-700 dark:hover:text-cyan-400`}>
                       <ArrowLeft className="mr-1 md:mr-2 w-4 h-4 rotate-180" /> <span className="hidden md:inline">العودة للأقسام</span>
                     </button>
                  </div>
              )}
              
-             {/* محتوى الموسوعة */}
+             {/* 🌟 محتوى الموسوعة */}
              <div className="p-4 md:p-8 max-w-6xl mx-auto w-full flex-grow relative z-10">
                  {!activeEncycCategory ? (
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-4">
+                   // شبكة أقسام الموسوعة
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 mt-2 md:mt-4">
                      {encyclopediaCategories.map(cat => {
                        const count = encyclopediaData.filter(ex => {
                           if (!ex.categoryId) return false;
@@ -1706,26 +1889,29 @@ const handleAddToStash = () => {
                        }).length;
 
                        return (
-                         <div key={cat.id} onClick={() => setActiveEncycCategory(cat)} className={`${t.panel} border ${t.border} hover:${t.borderFocus} rounded-2xl p-6 cursor-pointer transition-all hover:-translate-y-1 shadow-sm hover:shadow-md group relative overflow-hidden`}>
-                            <div className={`absolute top-0 left-0 w-full h-1 ${cat.bg.replace('/10', '')} opacity-50`}></div>
-                            <div className="flex justify-between items-start mb-4">
-                               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${cat.bg}`}>
-                                  <cat.icon className={`w-6 h-6 ${cat.color}`} />
+                         <div key={cat.id} onClick={() => setActiveEncycCategory(cat)} className={`neo-out rounded-2xl p-6 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg group relative overflow-hidden`}>
+                            {/* خط علوي تجميلي */}
+                            <div className={`absolute top-0 left-0 w-full h-1 ${cat.bg.replace('/10', '')} opacity-40 group-hover:opacity-100 transition-opacity`}></div>
+                            
+                            <div className="flex justify-between items-start mb-5">
+                               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center neo-in`}>
+                                  <cat.icon className={`w-7 h-7 ${cat.color}`} />
                                </div>
                                {count > 0 && (
-                                  <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${cat.color} ${t.borderFocus} ${t.input}`}>
+                                  <span className={`text-[11px] font-bold px-3 py-1.5 rounded-lg neo-in ${cat.color}`}>
                                     {count} أمثلة
                                   </span>
                                )}
                             </div>
-                            <h3 className={`text-xl font-bold ${t.text} mb-2 group-hover:text-[#d4af37] transition-colors`}>{cat.title}</h3>
-                            <p className={`${t.textMuted} text-sm leading-relaxed`}>{cat.desc}</p>
+                            <h3 className={`text-xl font-bold ${t.text} mb-3 group-hover:text-[#b48f27] dark:group-hover:text-[#d4af37] transition-colors`}>{cat.title}</h3>
+                            <p className={`${t.textMuted} text-sm leading-relaxed font-medium`}>{cat.desc}</p>
                          </div>
                        );
                      })}
                    </div>
                  ) : (
-                   <div className={`${t.panel} border ${t.border} rounded-3xl p-6 md:p-10 shadow-md mt-4`}>
+                   // شبكة الأمثلة داخل القسم المختار
+                   <div className="mt-4">
                      {(() => {
                         const categoryExamples = encyclopediaData.filter(ex => {
                             if (!ex.categoryId) return false;
@@ -1735,49 +1921,62 @@ const handleAddToStash = () => {
                         
                         if (categoryExamples.length === 0) {
                           return (
-                            <div className={`py-20 border-2 border-dashed ${t.borderFocus} rounded-2xl text-center ${t.input}`}>
-                               <Library className={`w-12 h-12 ${t.textMuted} mx-auto mb-4 opacity-50`} />
-                               <h3 className={`text-xl font-bold ${t.text} mb-2`}>لا توجد أمثلة بعد</h3>
-                               <p className={`${t.textMuted} max-w-md mx-auto text-sm`}>ستظهر الأمثلة هنا بمجرد إضافتك لها في قاعدة البيانات.</p>
+                            <div className={`py-24 neo-in rounded-3xl text-center`}>
+                               <Library className={`w-14 h-14 ${t.textMuted} mx-auto mb-4 opacity-50`} />
+                               <h3 className={`text-2xl font-bold ${t.text} mb-3`}>لا توجد أمثلة بعد</h3>
+                               <p className={`${t.textMuted} max-w-md mx-auto text-base font-bold`}>ستظهر الأمثلة هنا بمجرد إضافتك لها في قاعدة البيانات.</p>
                             </div>
                           );
                         }
 
-                        return (
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+return (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                             {categoryExamples.map((example, idx) => (
-                              <div key={idx} className={`${t.input} border ${t.border} rounded-2xl p-6 shadow-sm hover:${t.borderFocus} transition-all relative overflow-hidden group flex flex-col h-full`}>
-                                <div className={`absolute top-0 right-0 w-1 h-full ${activeEncycCategory.bg.replace('/10', '')} opacity-50 group-hover:opacity-100 transition-opacity`}></div>
+                              <div key={idx} className={`neo-out rounded-3xl p-6 md:p-8 transition-all relative overflow-hidden flex flex-col h-full`}>
+                                {/* الخط الجانبي التجميلي */}
+                                <div className={`absolute top-0 right-0 w-1.5 h-full ${activeEncycCategory.bg.replace('/10', '')} opacity-50`}></div>
                                 
-                                <div className="flex justify-between items-start mb-4">
-                                   <h3 className={`text-lg md:text-xl font-bold ${t.text} flex items-start leading-snug`}>
-                                     <Sparkles className={`w-5 h-5 ml-2 mt-1 shrink-0 ${activeEncycCategory.color}`} />
+                                {/* 🌟 عنوان المثال ورقم الآية */}
+                                <div className="flex justify-between items-start mb-5">
+                                   <h3 className={`text-lg md:text-xl font-bold flex items-start leading-relaxed`} style={{ color: isDarkMode ? '#f8fafc' : '#0f172a' }}>
+                                     <Sparkles className={`w-6 h-6 ml-2 shrink-0 ${activeEncycCategory.color}`} />
                                      {example.title}
                                    </h3>
                                    {example.surahId && example.ayahNumbers && example.ayahNumbers.length > 0 && (
-                                      <span className={`text-[10px] ${t.panel} border ${t.borderFocus} ${t.textMuted} px-2 py-1 rounded whitespace-nowrap`}>آية {example.ayahNumbers.join(', ')}</span>
+                                      <span className={`text-[10px] md:text-xs neo-in font-bold px-3 py-1.5 rounded-lg whitespace-nowrap mr-3`} style={{ color: isDarkMode ? '#2dd4bf' : '#0f766e' }}>
+                                        آية {example.ayahNumbers.join(', ')}
+                                      </span>
                                    )}
                                 </div>
                                  
-                                <div className={`${t.panel} border ${t.borderFocus} p-5 rounded-xl mb-4 text-center`}>
-                                  <p className="font-['Amiri_Quran'] text-2xl md:text-3xl leading-[4.5rem] text-[#d4af37]">
+                                {/* 🌟 النص القرآني (أخضر ملكي نهاراً / ذهبي ليلاً) */}
+                                <div className={`neo-in p-6 rounded-2xl mb-6 text-center`}>
+                                  <p className="font-['Amiri_Quran'] text-2xl md:text-3xl leading-[3.5rem] md:leading-[4rem] transition-colors" style={{ color: isDarkMode ? '#d4af37' : '#065f46' }}>
                                      "{example.quranText}"
                                   </p>
                                 </div>
                                  
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                  <span className={`${t.panel} ${t.textMuted} text-sm font-bold px-4 py-2 rounded-lg border ${t.borderFocus}`}>
-                                     {example.metricType}: <span className={activeEncycCategory.color}>{example.metricValue}</span>
+                                {/* 🌟 شارة الإحصاء (معالجة البهتان وتلوين النتيجة بالبنفسجي) */}
+                                <div className="flex flex-wrap justify-center gap-3 mb-6">
+                                  <span className={`neo-in text-sm md:text-base font-black px-5 py-3 rounded-xl border border-black/5 dark:border-white/5`}>
+                                     <span style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>
+                                       {example.metricType}:
+                                     </span> 
+                                     <span className="ml-1.5 inline-block" style={{ color: isDarkMode ? '#c084fc' : '#9333ea' }} dir="ltr">
+                                       {example.metricValue}
+                                     </span>
                                   </span>
                                 </div>
                                  
-                                <p className={`${t.text} text-sm leading-relaxed mb-6 flex-grow opacity-90`}>
+                                {/* 🌟 نص الشرح والتفاصيل */}
+                                <p className={`text-sm md:text-base font-medium leading-relaxed mb-8 flex-grow`} style={{ color: isDarkMode ? '#cbd5e1' : '#334155' }}>
                                   {example.explanation}
                                 </p>
                                  
-                                <div className={`border-t ${t.border} pt-4 mt-auto`}>
-                                  <p className={`${t.textMuted} text-xs flex items-center`}>
-                                    <BookOpen className="w-4 h-4 ml-1 shrink-0" />
+                                {/* 🌟 المصدر بالأسفل */}
+                                <div className={`border-t border-black/5 dark:border-white/5 pt-4 mt-auto`}>
+                                  <p className={`text-xs font-bold flex items-center`} style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                                    <BookOpen className="w-4 h-4 ml-1.5 shrink-0" />
                                     <span className="truncate" title={example.reference}>المصدر: {example.reference}</span>
                                   </p>
                                 </div>
@@ -1832,102 +2031,123 @@ const handleAddToStash = () => {
         )}
       </div>
 
-     {/* لوحة التحكم السفلية */}
+{/* لوحة التحكم السفلية بالنيومورفيزم المتكامل (بعد التنحيف لزيادة مساحة القراءة) */}
       {activeTab === 'main' && (
-        <div className={`fixed bottom-0 left-0 right-0 ${t.bottomBg} backdrop-blur-2xl border-t ${t.border} p-2 md:p-3 shadow-[0_-15px_40px_rgba(0,0,0,0.1)] z-50 rounded-t-3xl transition-colors duration-300`}>
+        <div className={`fixed bottom-0 left-0 right-0 neo-out border-b-0 rounded-b-none p-1.5 md:p-2 z-50 rounded-t-3xl transition-all duration-300`}>
           
+{/* قائمة التمشيط المنسدلة للأعلى */}
           {showToolsMenu && (
-            <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-[95%] md:w-[400px] ${t.panel} border-2 ${t.borderFocus} rounded-3xl p-3 shadow-2xl animate-fade-in-up z-50`}>
-              <div className={`flex justify-between items-center mb-2 px-3 py-2 border-b ${t.border}`}>
-                <span className={`font-bold ${t.text} text-base flex items-center`}><Layers className="w-5 h-5 ml-2 text-[#d4af37]"/> التمشيط والاستكشاف</span>
-                <button onClick={() => setShowToolsMenu(false)} className={`${t.textMuted} hover:${t.text} ${t.input} rounded-full p-2`}><X className="w-4 h-4"/></button>
+            <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-[95%] md:w-[420px] neo-out rounded-3xl p-3 animate-fade-in-up z-50 flex flex-col max-h-[65vh]`}>
+              
+              <div className={`flex justify-between items-center mb-3 px-2 pb-2 border-b border-black/5 dark:border-white/5 shrink-0`}>
+                <span className={`font-bold ${t.text} text-base md:text-lg flex items-center`}>
+                  <Layers className="w-5 h-5 ml-2 text-[#b48f27] dark:text-[#d4af37]"/> التمشيط والاستكشاف
+                </span>
+                <button onClick={() => setShowToolsMenu(false)} className={`${t.textMuted} hover:text-red-600 dark:hover:text-red-500 neo-out active:neo-in rounded-xl p-1.5 transition-colors`}>
+                  <X className="w-5 h-5"/>
+                </button>
               </div>
 
-              <div className="space-y-2 mt-3">
-                  <button onClick={() => runDiscovery('19_letters')} className={`w-full flex items-center text-right p-3 ${t.input} ${t.btnHover} rounded-2xl transition-all border ${t.border}`}>
-                    <div className="bg-emerald-500/10 p-2.5 rounded-xl ml-4 border border-emerald-500/20"><Scale className="w-5 h-5 text-emerald-500"/></div>
-                    <div><p className={`font-bold ${t.text}`}>مضاعفات 19 (في الحروف)</p><p className={`text-[11px] ${t.textMuted} mt-1`}>نصوص عدد حروفها يقبل القسمة على 19</p></div>
+              <div className="space-y-2.5 overflow-y-auto custom-scrollbar pr-1">
+                  <button onClick={() => runDiscovery('19_letters')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                    <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Scale className="w-5 h-5 text-emerald-700 dark:text-emerald-500"/></div>
+                    <div>
+                      {/* 🌟 تم استخدام t.text و t.textMuted لضمان التباين في الوضعين */}
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>مضاعفات 19 (في الحروف)</p>
+                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>نصوص عدد حروفها يقبل القسمة على 19</p>
+                    </div>
                   </button>
-                  <button onClick={() => runDiscovery('19_values')} className={`w-full flex items-center text-right p-3 ${t.input} ${t.btnHover} rounded-2xl transition-all border ${t.border}`}>
-                    <div className="bg-emerald-500/10 p-2.5 rounded-xl ml-4 border border-emerald-500/20"><Hash className="w-5 h-5 text-emerald-500"/></div>
-                    <div><p className={`font-bold ${t.text}`}>مضاعفات 19 (في القيم العددية)</p><p className={`text-[11px] ${t.textMuted} mt-1`}>نصوص قيمتها تقبل القسمة على 19</p></div>
+                  
+                  <button onClick={() => runDiscovery('19_values')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                    <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Hash className="w-5 h-5 text-emerald-700 dark:text-emerald-500"/></div>
+                    <div>
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>مضاعفات 19 (في القيم العددية)</p>
+                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>نصوص قيمتها تقبل القسمة على 19</p>
+                    </div>
                   </button>
-                  <button onClick={() => runDiscovery('balance_letters')} className={`w-full flex items-center text-right p-3 ${t.input} ${t.btnHover} rounded-2xl transition-all border ${t.border}`}>
-                   <div className="bg-cyan-500/10 p-2.5 rounded-xl ml-4 border border-cyan-500/20"><Scale className="w-5 h-5 text-cyan-500"/></div>
-                    <div><p className={`font-bold ${t.text}`}>توازنات الحروف (نصين فأكثر)</p><p className={`text-[11px] ${t.textMuted} mt-1`}>تطابق نصوص منفصلة في عدد الحروف</p></div>
+                  
+                  <button onClick={() => runDiscovery('balance_letters')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                   <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Scale className="w-5 h-5 text-cyan-700 dark:text-cyan-500"/></div>
+                    <div>
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>توازنات الحروف (نصين فأكثر)</p>
+                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>تطابق نصوص منفصلة في عدد الحروف</p>
+                    </div>
                   </button>
-                  <button onClick={() => runDiscovery('balance_values')} className={`w-full flex items-center text-right p-3 ${t.input} ${t.btnHover} rounded-2xl transition-all border ${t.border}`}>
-                    <div className="bg-purple-500/10 p-2.5 rounded-xl ml-4 border border-purple-500/20"><Hash className="w-5 h-5 text-purple-500"/></div>
-                    <div><p className={`font-bold ${t.text}`}>توازنات القيم العددية (نصين فأكثر)</p><p className={`text-[11px] ${t.textMuted} mt-1`}>تطابق نصوص منفصلة في حساب الجُمَّل</p></div>
+                  
+                  <button onClick={() => runDiscovery('balance_values')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                    <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Hash className="w-5 h-5 text-purple-700 dark:text-purple-500"/></div>
+                    <div>
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>توازنات القيم العددية (نصين فأكثر)</p>
+                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>تطابق نصوص منفصلة في حساب الجُمَّل</p>
+                    </div>
                   </button>
               </div>
             </div>
           )}
-<div className="flex justify-center items-center gap-3 mb-2">
-            <button onClick={() => { setSelectionMode('word'); clearSelection(); setShowToolsMenu(false); }} className={`flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${selectionMode === 'word' ? (isDarkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-slate-900 border-slate-700 text-white') : `${t.input} ${t.border} ${t.textMuted} hover:${t.borderFocus}`}`}><Type className="w-3 h-3 ml-2" /> تحديد: حر / سحب</button>
-            <button onClick={() => { setSelectionMode('ayah'); clearSelection(); setShowToolsMenu(false); }} className={`flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${selectionMode === 'ayah' ? (isDarkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-slate-900 border-slate-700 text-white') : `${t.input} ${t.border} ${t.textMuted} hover:${t.borderFocus}`}`}><Book className="w-3 h-3 ml-2" /> تحديد آيات كاملة</button>
+
+{/* 🌟 شريط أدوات التحديد (تمت محاذاته وتصحيح ألوان النصوص لتتناسب مع الوضعين النهاري والليلي بوضوح تام) */}
+          {/* 🌟 شريط أدوات التحديد (تمت إضافة مساحة p-3 لمنع قص الظل) */}
+          <div className="flex items-center justify-between max-w-4xl mx-auto w-full gap-2 overflow-x-auto custom-scrollbar px-3 py-3 mb-1">
+            
+            {/* الجزء الأيمن */}
+            <div className="flex-1 flex justify-start shrink-0 min-w-[80px]">
+              {(selectedWords.size > 0 || selectedAyahs.size > 0) && (
+                <button onClick={handleCopySelectedText} className="flex items-center px-3 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-out active:neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                  <Copy className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1" /> <span className="hidden md:inline">نسخ التحديد</span><span className="inline md:hidden">نسخ</span>
+                </button>
+              )}
+            </div>
+            
+            {/* الجزء الأوسط */}
+            <div className="flex items-center justify-center gap-1.5 md:gap-2 shrink-0">
+              <button onClick={() => { setSelectionMode('word'); clearSelection(); setShowToolsMenu(false); }} className={`flex items-center px-3 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all ${selectionMode === 'word' ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
+                <Type className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 text-[#b48f27] dark:text-[#d4af37]" /> تحديد حر
+              </button>
+              <button onClick={() => { setSelectionMode('ayah'); clearSelection(); setShowToolsMenu(false); }} className={`flex items-center px-3 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all ${selectionMode === 'ayah' ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
+                <Book className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 text-[#b48f27] dark:text-[#d4af37]" /> تحديد آيات
+              </button>
+            </div>
+            
+            {/* الجزء الأيسر */}
+            <div className="flex-1 flex justify-end shrink-0 min-w-[80px]">
+              {(selectedWords.size > 0 || selectedAyahs.size > 0) && (
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setIsExportModalOpen(true)} className="flex items-center px-2.5 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-out active:neo-in text-[#b48f27] dark:text-[#d4af37] whitespace-nowrap">
+                    <Share2 className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 inline" /> <span className="hidden md:inline">تصدير</span>
+                  </button>
+                  <button onClick={handleAddToStash} className="flex items-center px-2.5 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-out active:neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                    <Plus className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 inline" /> <span className="hidden md:inline">إضافة</span>
+                  </button>
+                  {stashedResults.length > 0 && (
+                    <button onClick={() => setIsCanvasModalOpen(true)} className="flex items-center px-2.5 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                      اللوحة ({stashedResults.length})
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
-          {/* 🌟 أزرار الإجراءات المباشرة (النسخ والتصدير) - تظهر فقط عند التحديد */}
-{(selectedWords.size > 0 || selectedAyahs.size > 0) && (
-  <div className="flex justify-between items-center max-w-3xl mx-auto w-full px-2 mb-3">
-    
-    {/* زر النسخ القديم (يمين) */}
-    <button onClick={handleCopySelectedText} className="flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md border border-emerald-500">
-      <Copy className="w-3 h-3 ml-1" /> نسخ التحديد
-    </button>
-
-    {/* 🌟 مجموعة أزرار التصدير والإضافة واللوحة (يسار) */}
-    <div className="flex gap-2">
-      
-      {/* زر تصدير النتيجة الحالية */}
-      <button onClick={() => setIsExportModalOpen(true)} className="flex items-center px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-[#d4af37]/20 text-[#d4af37] hover:bg-[#d4af37]/40 shadow-sm border border-[#d4af37]/30">
-        <Share2 className="w-3 h-3 ml-1" /> تصدير
-      </button>
-
-      {/* مجموعة أزرار الإضافة وفتح اللوحة */}
-      <div className="flex items-center">
-        <button 
-          onClick={handleAddToStash} 
-          className={`flex items-center px-3 py-1.5 text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md border border-emerald-500 ${stashedResults.length > 0 ? 'rounded-r-full border-l-0' : 'rounded-full'}`}
-        >
-          <Plus className="w-3 h-3 ml-1" /> إضافة
-        </button>
-        
-        {/* زر فتح اللوحة (يظهر فقط إذا كان هناك عناصر مضافة) */}
-        {stashedResults.length > 0 && (
-          <button 
-            onClick={() => setIsCanvasModalOpen(true)} 
-            className="flex items-center px-3 py-1.5 rounded-l-full text-xs font-bold transition-all bg-emerald-700 hover:bg-emerald-800 text-white shadow-md border border-emerald-700 border-r-0"
-          >
-            اللوحة ({stashedResults.length})
-          </button>
-        )}
-      </div>
-
-    </div>
-
-  </div>
-)}
-          <div className="flex justify-center gap-3 max-w-3xl mx-auto w-full">
-            <button onClick={handleCalculateStats} className="flex-1 flex flex-col items-center justify-center bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 py-2 rounded-2xl font-bold transition-all border border-indigo-500/30 shadow-sm">
-              <BarChart3 className="w-5 h-5 mb-1" /> <span className="text-xs tracking-wide">1. إحصاء النص</span>
+          {/* 🌟 الأزرار الثلاثة الرئيسية */}
+          <div className="flex justify-center gap-2 md:gap-3 max-w-4xl mx-auto w-full">
+            <button onClick={handleCalculateStats} className={`flex-1 flex flex-row items-center justify-center neo-out active:neo-in ${t.text} py-1.5 md:py-2 rounded-xl font-bold transition-all`}>
+              <BarChart3 className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 text-indigo-700 dark:text-indigo-400" /> <span className="text-[11px] md:text-sm tracking-wide">1. إحصاء النص</span>
             </button>
             
-            <button onClick={() => { if(discoveries.length > 0) clearSelection(); else setShowToolsMenu(!showToolsMenu); }} disabled={isDiscovering} className={`flex-[1.5] flex flex-col items-center justify-center py-2 rounded-2xl font-bold transition-all shadow-md border ${discoveries.length > 0 ? `${t.panel} border-red-500/30 text-red-500` : 'bg-[#d4af37] border-transparent text-white hover:bg-[#b48f27]'}`}>
-              {discoveries.length > 0 ? <X className="w-5 h-5 mb-1" /> : <ListFilter className={`w-5 h-5 mb-1 ${isDiscovering ? 'animate-pulse' : ''}`} />}
-              <span className="text-xs tracking-wide">{isDiscovering ? 'جاري التمشيط...' : (discoveries.length > 0 ? 'إلغاء البحث' : '2. تمشيط واستكشاف')}</span>
+            <button onClick={() => { if(discoveries.length > 0) clearSelection(); else setShowToolsMenu(!showToolsMenu); }} disabled={isDiscovering} className={`flex-[1.5] flex flex-row items-center justify-center py-1.5 md:py-2 rounded-xl font-bold transition-all ${discoveries.length > 0 ? 'neo-in text-red-600 dark:text-red-500' : (showToolsMenu ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in text-[#b48f27] dark:text-[#d4af37]`)}`}>
+              {discoveries.length > 0 ? <X className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5" /> : <ListFilter className={`w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 ${isDiscovering ? 'animate-pulse' : ''}`} />}
+              <span className="text-[11px] md:text-sm tracking-wide">{isDiscovering ? 'جاري التمشيط...' : (discoveries.length > 0 ? 'إلغاء البحث' : '2. تمشيط واستكشاف')}</span>
             </button>
 
-            <button onClick={() => {setActiveTab('library'); setShowToolsMenu(false);}} className={`flex-1 flex flex-col items-center justify-center ${t.panel} ${t.btnHover} ${t.textMuted} hover:${t.text} py-2 rounded-2xl font-bold transition-colors relative border ${t.border} shadow-sm`}>
-              <BookmarkPlus className="w-5 h-5 mb-1 text-[#d4af37]" /> <span className="text-xs tracking-wide">مكتبتي</span>
-              {savedDiscoveries.length > 0 && <span className="absolute top-1 left-1 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">{savedDiscoveries.length}</span>}
+            <button onClick={() => {setActiveTab('library'); setShowToolsMenu(false);}} className={`flex-1 flex flex-row items-center justify-center neo-out active:neo-in ${t.text} py-1.5 md:py-2 rounded-xl font-bold transition-all relative`}>
+              <BookmarkPlus className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 text-[#b48f27] dark:text-[#d4af37]" /> <span className="text-[11px] md:text-sm tracking-wide">مكتبتي</span>
+              {savedDiscoveries.length > 0 && <span className="absolute -top-1 -left-1 neo-in text-white bg-red-600 dark:bg-transparent dark:text-red-500 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">{savedDiscoveries.length}</span>}
             </button>
           </div>
         </div>
       )}
 
-      {/* الستايلات والأنيميشن للثيمات ونبض الإعجاز */}
+{/* الستايلات والأنيميشن للثيمات ونبض الإعجاز */}
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -1935,7 +2155,35 @@ const handleAddToStash = () => {
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         
-        /* 🌟 أنيميشن النبض المزدوج للآيات الإعجازية */
+        /* 🌟 النيومورفيزم للوضع النهاري (حواف حادة بخيط أبيض وظلال أقوى وأكثر حدة) */
+        .neo-out {
+            box-shadow: 4px 4px 8px rgba(140, 155, 175, 0.75), 
+                       -4px -4px 8px rgba(255, 255, 255, 1);
+           background-color: #e2e8f0; /* درجة رمادية دافئة ومريحة تخفف السطوع */
+            border: 1px solid rgba(255, 255, 255, 1);
+        }
+        .neo-in {
+            box-shadow: inset 3px 3px 6px rgba(140, 155, 175, 0.75), 
+                        inset -3px -3px 6px rgba(255, 255, 255, 1);
+            background-color: #e8ecef;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        /* 🌟 الوضع الليلي (ظلال أقوى، أضيق، وإطار أبيض دقيق وواضح) */
+        .dark .neo-out {
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.75), 
+                       -3px -3px 6px rgba(255, 255, 255, 0.08);
+            background-color: #0f172a; 
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .dark .neo-in {
+            box-shadow: inset 4px 4px 8px rgba(0, 0, 0, 0.8), 
+                        inset -2px -2px 5px rgba(255, 255, 255, 0.05);
+            background-color: #0f172a; 
+            border: 1px solid rgba(0, 0, 0, 0.4);
+        }
+        
+        /* أنيميشن النبض المزدوج للآيات الإعجازية */
         @keyframes doubleGlowPulse {
             0% { filter: drop-shadow(0 0 0px transparent); color: inherit; }
             20% { filter: drop-shadow(0 0 8px rgba(212,175,55,0.9)); color: #d4af37; }
@@ -1944,18 +2192,17 @@ const handleAddToStash = () => {
             100% { filter: drop-shadow(0 0 4px rgba(212,175,55,0.6)); color: #d4af37; }
         }
         
-        /* تفعيل النبض فقط أثناء القراءة العادية وليس أثناء البحث */
         .reading-mode .miracle-ayah-wrapper:hover .miracle-word {
             animation: doubleGlowPulse 1.2s ease-in-out forwards;
         }
       `}} />
-      {/* 🌟 نافذة تصدير الإحصائيات (تُحسب الأرقام تلقائياً مع تفصيل مضاعفات 19) */}
+      
+{/* 🌟 نافذة تصدير الإحصائيات */}
           {isExportModalOpen && (
               (() => {
                   const scope = getSearchScope();
                   if (scope.length === 0) return null;
                   
-                  // 🌟 الكود الجديد لتوليد النص مع أرقام الآيات
                   let actualText = "";
                   for (let i = 0; i < scope.length; i++) {
                       const currentItem = scope[i];
@@ -1975,84 +2222,76 @@ const handleAddToStash = () => {
                   let currentValue = 0;
                   scope.forEach(fw => { currentLetters += fw.letterCount; currentValue += fw.value; });
 
-                  // 🌟 التحقق من مضاعفات العدد 19
                   const isWords19 = currentWords > 0 && currentWords % 19 === 0;
                   const isLetters19 = currentLetters > 0 && currentLetters % 19 === 0;
                   const isValue19 = currentValue > 0 && currentValue % 19 === 0;
 
-                  // 🌟 تجهيز نصوص التصدير لتشمل تفصيل المضاعفات إن وجدت
                   const wordsExportText = isWords19 ? `${currentWords} كلمة (19 × ${currentWords / 19})` : `${currentWords} كلمة`;
                   const lettersExportText = isLetters19 ? `${currentLetters} حرف (19 × ${currentLetters / 19})` : `${currentLetters} حرف`;
                   const valueExportText = isValue19 ? `${currentValue} (19 × ${currentValue / 19})` : `${currentValue}`;
 
                   return (
-                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-                          <div className="bg-slate-900 border border-[#d4af37]/50 rounded-3xl p-6 w-full max-w-md shadow-2xl animate-fade-in-up">
-                              <div className="flex justify-between items-center mb-5">
-                                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                      <Share2 className="w-5 h-5 text-[#d4af37]"/> تصدير الإحصائية
+                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                          {/* 🌟 الغلاف الخارجي: يعتمد على t.panel ليتطابق مع الثيم 100% مع ظل داكن قوي */}
+                          <div className={`${t.panel} shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)] border ${t.border} rounded-3xl p-6 md:p-8 w-full max-w-lg animate-fade-in-up`}>
+                              <div className="flex justify-between items-center mb-6">
+                                  <h3 className={`text-xl font-bold ${t.text} flex items-center gap-2`}>
+                                      <Share2 className="w-6 h-6 text-[#d4af37]"/> تصدير الإحصائية
                                   </h3>
-                                  <button onClick={() => setIsExportModalOpen(false)} className="text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition-colors">
+                                  <button onClick={() => setIsExportModalOpen(false)} className={`${t.textMuted} hover:${t.text} neo-out p-2 rounded-xl transition-colors`}>
                                       <X className="w-5 h-5"/>
                                   </button>
                               </div>
 
-                              <div className="bg-slate-800/80 p-5 rounded-2xl border border-white/10 mb-5 text-right select-all">
-                                  <p className="mb-4 text-[#d4af37] text-lg leading-relaxed" style={{ fontFamily: "'Amiri Quran', serif" }}>
+                              <div className="neo-in p-6 rounded-2xl mb-6 text-right select-all">
+                                  <p className="mb-6 text-[#d4af37] text-xl leading-relaxed text-center" style={{ fontFamily: "'Amiri Quran', serif" }}>
                                       "{actualText}"
                                   </p>
                                   
-                                  <div className="space-y-2 text-sm bg-slate-900/50 p-3 rounded-xl border border-white/5">
+                                  <div className="space-y-4 text-sm neo-in p-4 rounded-xl border border-white/40 dark:border-white/5">
                                       <div className="flex justify-between items-center">
-                                          <span className="text-cyan-400">عدد الكلمات:</span>
-                                          <span className="text-white font-bold flex items-center gap-2">
-                                              {isWords19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {currentWords / 19}</span>}
+                                          <span className="text-cyan-600 dark:text-cyan-400 font-bold">عدد الكلمات:</span>
+                                          <span className={`${t.text} font-bold flex items-center gap-2 text-lg`}>
+                                              {isWords19 && <span className="text-emerald-500 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {currentWords / 19}</span>}
                                               {currentWords} كلمة
                                           </span> 
                                       </div>
                                       <div className="flex justify-between items-center">
-                                          <span className="text-cyan-400">عدد الحروف:</span>
-                                          <span className="text-white font-bold flex items-center gap-2">
-                                              {isLetters19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {currentLetters / 19}</span>}
+                                          <span className="text-cyan-600 dark:text-cyan-400 font-bold">عدد الحروف:</span>
+                                          <span className={`${t.text} font-bold flex items-center gap-2 text-lg`}>
+                                              {isLetters19 && <span className="text-emerald-500 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {currentLetters / 19}</span>}
                                               {currentLetters} حرف
                                           </span> 
                                       </div>
-                                      <div className="flex justify-between items-center border-t border-white/10 pt-2 mt-2">
+                                      <div className={`flex justify-between items-center border-t ${t.border} pt-3 mt-3`}>
                                           <span className="text-[#d4af37] font-bold">القيمة العددية:</span>
-                                          <span className="text-[#d4af37] font-bold flex items-center gap-2">
-                                              {isValue19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {currentValue / 19}</span>}
+                                          <span className="text-[#d4af37] font-bold flex items-center gap-2 text-lg">
+                                              {isValue19 && <span className="text-emerald-500 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {currentValue / 19}</span>}
                                               {currentValue}
                                           </span> 
                                       </div>
                                   </div>
                                   
-                                  <p className="text-xs text-slate-500 text-center mt-4">تم الإحصاء بواسطة تطبيق الرَّقِيم</p>
+                                  <p className={`text-xs ${t.textMuted} text-center mt-5`}>تم الإحصاء بواسطة تطبيق الرَّقِيم</p>
                               </div>
 
-                              <div className="flex gap-3">
-                                  <button 
-                                      onClick={() => {
+                              <div className="flex gap-4">
+                                  <button onClick={() => {
                                           const exportText = `النص: ${actualText}\nعدد الكلمات: ${wordsExportText}\nعدد الحروف: ${lettersExportText}\nالقيمة العددية: ${valueExportText}\n\nتم الإحصاء بواسطة تطبيق الرَّقِيم`;
                                           navigator.clipboard.writeText(exportText);
                                           setIsExportModalOpen(false);
                                       }}
-                                      className="flex-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-2 transition-colors"
+                                      className="flex-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-lg transition-colors"
                                   >
                                       <Copy className="w-5 h-5" /> نسخ التقرير
                                   </button>
-                                  
-                                  <button 
-                                      onClick={() => {
+                                  <button onClick={() => {
                                           const exportText = `النص: ${actualText}\r\nعدد الكلمات: ${wordsExportText}\r\nعدد الحروف: ${lettersExportText}\r\nالقيمة العددية: ${valueExportText}\r\n\r\nتم الإحصاء بواسطة تطبيق الرَّقِيم`;
                                           const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
                                           const url = URL.createObjectURL(blob);
-                                          const link = document.createElement('a');
-                                          link.href = url;
-                                          link.download = 'إحصائية_الرقيم.txt';
-                                          link.click();
-                                          URL.revokeObjectURL(url);
+                                          const link = document.createElement('a'); link.href = url; link.download = 'إحصائية_الرقيم.txt'; link.click(); URL.revokeObjectURL(url);
                                       }}
-                                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-white border border-white/10 font-bold py-3 rounded-xl flex justify-center items-center gap-2 transition-colors"
+                                      className={`flex-1 neo-out font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 transition-colors ${t.text}`}
                                   >
                                       <Download className="w-5 h-5" /> حفظ كملف
                                   </button>
@@ -2063,66 +2302,149 @@ const handleAddToStash = () => {
               })()
           )}
           <Analytics />
-          {/* 🌟 نافذة اللوحة الفنية للتقرير المجمع (Canvas) - التصميم الجديد */}
-          {isCanvasModalOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-              <div className="bg-slate-900 border border-[#d4af37]/50 rounded-3xl w-full max-w-2xl shadow-2xl animate-fade-in-up my-auto flex flex-col max-h-[90vh]">
 
-                {/* 🌟 ترويسة اللوحة وزر الإغلاق */}
-                <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Share2 className="w-5 h-5 text-[#d4af37]" /> التقرير الإحصائي المجمع
+{/* 🌟 نافذة اللوحة الفنية للتقرير المجمع (Canvas) */}
+          {isCanvasModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className={`${t.panel} shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)] border ${t.border} rounded-3xl w-full max-w-2xl animate-fade-in-up my-auto flex flex-col max-h-[90vh]`}>
+
+                <div className={`flex justify-between items-center p-6 border-b ${t.border} shrink-0`}>
+                  <h3 className={`text-xl font-bold ${t.text} flex items-center gap-2`}>
+                    <Share2 className="w-6 h-6 text-[#b48f27] dark:text-[#d4af37]" /> التقرير الإحصائي المجمع
                   </h3>
-                  <button onClick={() => setIsCanvasModalOpen(false)} className="text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition-colors">
+                  <button onClick={() => setIsCanvasModalOpen(false)} className={`${t.textMuted} hover:text-red-600 dark:hover:text-red-500 neo-out active:neo-in p-2.5 rounded-xl transition-colors`}>
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                {/* 🌟 منطقة اللوحة التي سيتم تصويرها (Canvas) */}
-                <div className="overflow-y-auto custom-scrollbar p-6 grow bg-slate-950/50">
-                  <div id="export-canvas-container" className="bg-slate-800/90 p-6 rounded-2xl border border-white/10 relative">
+                <div className="overflow-y-auto custom-scrollbar p-6 grow">
+                  <div id="export-canvas-container" className="neo-in p-6 md:p-8 rounded-3xl relative">
                     
-                    <div className="text-center mb-6 border-b border-white/10 pb-4">
-                      <h2 className="text-2xl font-bold text-[#d4af37] mb-1">الرَّقِيم</h2>
-                      <p className="text-sm text-slate-300">التقرير الإحصائي المجمع للآيات</p>
+                    <div className={`text-center mb-8 border-b ${t.border} pb-6`}>
+                      <h2 className="text-3xl font-black text-[#b48f27] dark:text-[#d4af37] mb-2 tracking-wide">الرَّقِيم</h2>
+                      <p className={`text-sm ${t.textMuted} font-bold`}>التقرير الإحصائي المجمع للآيات</p>
                     </div>
 
-                    <div className="space-y-6">
+<div className="space-y-6">
                       {stashedResults.map((item, index) => {
-                        // حسابات مضاعفات 19 التلقائية
                         const isWords19 = item.wordCount > 0 && item.wordCount % 19 === 0;
                         const isLetters19 = item.count > 0 && item.count % 19 === 0;
                         const isValue19 = item.numericalValue > 0 && item.numericalValue % 19 === 0;
 
+                        // 🌟 نظام الألوان الذكي والمباشر (لضمان تطبيقه دائماً)
+                        const color19 = isDarkMode ? '#c084fc' : '#9333ea'; // بنفسجي للإعجاز ومضاعفات 19
+                        const colorTextNormal = isDarkMode ? '#38bdf8' : '#0284c7'; // أزرق سماوي للكلمات والحروف
+                        const colorValueNormal = isDarkMode ? '#d4af37' : '#065f46'; // ذهبي/أخضر للقيمة العددية
+                        
+                        // تحديد لون كل صف بناءً على النتيجة
+                        const colorWord = isWords19 ? color19 : colorTextNormal;
+                        const colorLetter = isLetters19 ? color19 : colorTextNormal;
+                        const colorValue = isValue19 ? color19 : colorValueNormal;
+
+                        // تصميم شارة (19 × N) لتتطابق مع اللون البنفسجي
+                        const badgeStyle = {
+                          backgroundColor: isDarkMode ? 'rgba(192, 132, 252, 0.15)' : 'rgba(147, 51, 234, 0.1)',
+                          borderColor: isDarkMode ? 'rgba(192, 132, 252, 0.3)' : 'rgba(147, 51, 234, 0.2)',
+                          borderWidth: '1px',
+                          borderStyle: 'solid'
+                        };
+
+                        let referenceText = "";
+                        if (item.surahName || item.surahId) {
+                          const sName = item.surahName || (typeof quranDatabase !== 'undefined' && quranDatabase.find(s => s.id === item.surahId)?.name) || "";
+                          const aNum = item.ayahNumber || (item.ayahNumbers ? item.ayahNumbers.join(', ') : "");
+                          if (sName && aNum) referenceText = `سُورَةُ ${sName}: ${aNum}`;
+                          else if (sName) referenceText = `سُورَةُ ${sName}`;
+                        } else if (item.reference) {
+                          referenceText = item.reference;
+                        }
+
                         return (
-                          <div key={item.id} className="bg-slate-900/60 rounded-xl border border-white/5 p-5 relative shadow-inner">
-                            <div className="absolute top-0 right-0 bg-[#d4af37]/20 text-[#d4af37] text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-xl">
+                          <div key={item.id} className="neo-out rounded-2xl p-6 relative mt-4">
+                            <div className="absolute top-0 right-0 bg-gradient-to-r from-[#d4af37] to-[#b48f27] text-white text-xs font-bold px-4 py-1.5 rounded-bl-2xl rounded-tr-2xl shadow-sm">
                               نتيجة {index + 1}
                             </div>
                             
-                            <p className="mt-4 mb-5 text-[#d4af37] text-xl md:text-2xl leading-loose text-center" style={{ fontFamily: "'Amiri Quran', serif" }}>
-                              "{item.text}"
-                            </p>
+{/* 🌟 النص القرآني والتوثيق (بدون تعريض الخط للحفاظ على جمالية التشكيل) */}
+                            <div className="mt-8 mb-6 text-center leading-loose px-2">
+                              <span 
+                                className="text-xl md:text-2xl transition-colors" 
+                                style={{ color: isDarkMode ? '#d4af37' : '#065f46', fontFamily: "'Amiri Quran', serif", lineHeight: '2.2' }}>
+                                "{item.text}"
+                              </span>
+                              {referenceText && (
+                                <span 
+                                  className="inline-block mr-2 text-sm md:text-base transition-colors" 
+                                  style={{ color: isDarkMode ? '#2dd4bf' : '#0f766e', fontFamily: "'Amiri Quran', serif" }}>
+                                  [{referenceText}]
+                                </span>
+                              )}
+                            </div>
 
-                            <div className="space-y-2 text-sm bg-slate-800/80 p-3 rounded-xl border border-white/5">
+<div className="space-y-3 text-sm neo-in p-4 rounded-xl">
+                              
+                              {/* 🌟 عدد الكلمات */}
                               <div className="flex justify-between items-center">
-                                <span className="text-cyan-400">عدد الكلمات:</span>
-                                <span className="text-white font-bold flex items-center gap-2">
-                                  {isWords19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {item.wordCount / 19}</span>}
+                                <span 
+                                  className={isDarkMode ? "text-cyan-400 font-bold" : "font-bold transition-colors"}
+                                  style={!isDarkMode ? { color: isWords19 ? '#9333ea' : '#0284c7' } : {}}>
+                                  عدد الكلمات:
+                                </span>
+                                <span 
+                                  className={isDarkMode ? `${t.text} font-bold flex items-center gap-2 text-lg` : "font-bold flex items-center gap-2 text-lg transition-colors"}
+                                  style={!isDarkMode ? { color: isWords19 ? '#9333ea' : '#0284c7' } : {}}>
+                                  {isWords19 && (
+                                    <span 
+                                      className={isDarkMode ? "text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" : "text-xs px-2 py-0.5 rounded-md border"}
+                                      style={!isDarkMode ? { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' } : {}}
+                                      dir="ltr">
+                                      19 × {item.wordCount / 19}
+                                    </span>
+                                  )}
                                   {item.wordCount} كلمة
                                 </span>
                               </div>
+                              
+                              {/* 🌟 عدد الحروف */}
                               <div className="flex justify-between items-center">
-                                <span className="text-cyan-400">عدد الحروف:</span>
-                                <span className="text-white font-bold flex items-center gap-2">
-                                  {isLetters19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {item.count / 19}</span>}
+                                <span 
+                                  className={isDarkMode ? "text-cyan-400 font-bold" : "font-bold transition-colors"}
+                                  style={!isDarkMode ? { color: isLetters19 ? '#9333ea' : '#0284c7' } : {}}>
+                                  عدد الحروف:
+                                </span>
+                                <span 
+                                  className={isDarkMode ? `${t.text} font-bold flex items-center gap-2 text-lg` : "font-bold flex items-center gap-2 text-lg transition-colors"}
+                                  style={!isDarkMode ? { color: isLetters19 ? '#9333ea' : '#0284c7' } : {}}>
+                                  {isLetters19 && (
+                                    <span 
+                                      className={isDarkMode ? "text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" : "text-xs px-2 py-0.5 rounded-md border"}
+                                      style={!isDarkMode ? { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' } : {}}
+                                      dir="ltr">
+                                      19 × {item.count / 19}
+                                    </span>
+                                  )}
                                   {item.count} حرف
                                 </span>
                               </div>
-                              <div className="flex justify-between items-center border-t border-white/10 pt-2 mt-2">
-                                <span className="text-[#d4af37] font-bold">القيمة العددية:</span>
-                                <span className="text-[#d4af37] font-bold flex items-center gap-2">
-                                  {isValue19 && <span className="text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" dir="ltr">19 × {item.numericalValue / 19}</span>}
+                              
+                              {/* 🌟 القيمة العددية */}
+                              <div className="flex justify-between items-center border-t border-black/5 dark:border-white/5 pt-3 mt-3">
+                                <span 
+                                  className="font-bold transition-colors"
+                                  style={isDarkMode ? { color: '#d4af37' } : { color: isValue19 ? '#9333ea' : '#065f46' }}>
+                                  القيمة العددية:
+                                </span>
+                                <span 
+                                  className="font-bold flex items-center gap-2 text-lg transition-colors"
+                                  style={isDarkMode ? { color: '#d4af37' } : { color: isValue19 ? '#9333ea' : '#065f46' }}>
+                                  {isValue19 && (
+                                    <span 
+                                      className={isDarkMode ? "text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" : "text-xs px-2 py-0.5 rounded-md border"}
+                                      style={!isDarkMode ? { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' } : {}}
+                                      dir="ltr">
+                                      19 × {item.numericalValue / 19}
+                                    </span>
+                                  )}
                                   {item.numericalValue}
                                 </span>
                               </div>
@@ -2131,32 +2453,19 @@ const handleAddToStash = () => {
                         )
                       })}
                     </div>
-                    
-                    <p className="text-xs text-slate-500 text-center mt-6">تم الإحصاء بواسطة تطبيق الرَّقِيم</p>
+                    <p className={`text-xs ${t.textMuted} font-bold text-center mt-8`}>تم الإحصاء بواسطة تطبيق الرَّقِيم</p>
                   </div>
                 </div>
 
-                {/* 🌟 أزرار التحكم (خارج منطقة التصوير) */}
-                <div className="p-6 border-t border-white/10 flex gap-3 shrink-0 bg-slate-900 rounded-b-3xl">
-                  <button 
-                    onClick={handleExportCanvas}
-                    className="flex-[2] bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-2 transition-colors"
-                  >
-                    <Download className="w-5 h-5" /> تصدير اللوحة كصورة
+                <div className={`p-6 border-t ${t.border} flex gap-4 shrink-0`}>
+                  {/* 🌟 إصلاح لون زر التصدير ليقرأ من الثيم بدلاً من الأبيض الثابت */}
+                  <button onClick={handleExportCanvas} className={`flex-[2] ${t.text} font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-sm transition-colors neo-out active:neo-in border-none`}>
+                    <Download className="w-5 h-5 text-teal-700 dark:text-teal-400" /> تصدير اللوحة كصورة
                   </button>
-                  <button 
-                    onClick={() => {
-                        if(window.confirm('هل أنت متأكد من إفراغ اللوحة وحذف كل النتائج؟')) {
-                            setStashedResults([]);
-                            setIsCanvasModalOpen(false);
-                        }
-                    }} 
-                    className="flex-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 hover:text-white font-bold py-3 rounded-xl flex justify-center items-center transition-colors"
-                  >
+                  <button onClick={() => { if(window.confirm('هل أنت متأكد من إفراغ اللوحة؟')) { setStashedResults([]); setIsCanvasModalOpen(false); } }} className={`flex-1 text-red-600 dark:text-red-500 font-bold py-3.5 rounded-2xl flex justify-center items-center transition-colors neo-out active:neo-in`}>
                     إفراغ اللوحة
                   </button>
                 </div>
-
               </div>
             </div>
           )}
