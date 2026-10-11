@@ -1916,7 +1916,7 @@ const handleDragStart = (wordId) => {
             )}
 
             {/* النص القرآني المصفح */}
-            <div className={`text-justify leading-[4.5rem] md:leading-[5.5rem] ${isDarkMode ? t.panel : 'bg-[#fdf6e3] border-[#e8d89e]'} p-6 md:p-10 rounded-3xl shadow-md border select-none`} style={{ fontFamily: "'Amiri Quran', serif", fontSize: '2rem' }}>
+            <div className={`text-center md:text-justify leading-[4.5rem] md:leading-[5.5rem] ${isDarkMode ? t.panel : 'bg-[#fdf6e3] border-[#e8d89e]'} p-6 md:p-10 rounded-3xl shadow-md border select-none`} style={{ fontFamily: "'Amiri Quran', serif", fontSize: '2rem' }}>
               
               {currentPage === 1 && activeSurahId !== 1 && activeSurahId !== 9 && (
                 <div className={`text-center mb-10 pb-8 border-b ${t.border}`}>
