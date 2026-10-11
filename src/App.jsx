@@ -1888,7 +1888,7 @@ const handleDragStart = (wordId) => {
                            </div>
                            
                            {/* 🌟 النص القرآني (تم تقليل ارتفاع السطر قليلاً للهاتف) */}
-                           <p className={`font-['Amiri_Quran'] text-xl md:text-3xl leading-[3.5rem] md:leading-[5rem] text-center ${t.quranText} pt-1 pb-1 px-1 md:px-2 overflow-visible`}>
+                           <p className={`font-['Amiri_Quran'] text-2xl md:text-5xl leading-[3.5rem] md:leading-[5rem] text-center ${t.quranText} pt-1 pb-1 px-1 md:px-2 overflow-visible`}>
                              "{getDiscoveryTextSnippet(seg)}"
                            </p>
                         </div>
