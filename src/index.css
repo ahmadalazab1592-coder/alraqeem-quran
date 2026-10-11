@@ -1,6 +1,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 🌟 تعريف خط الأميري للعمل بدون إنترنت 🌟 */
+@font-face {
+  font-family: 'Amiri';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap; 
+  src: url('/fonts/Amiri-Regular.ttf') format('truetype');
+}
+
 /* 🌟 تأثيرات النيومورفيزم (Neumorphism) للوضعين النهاري والليلي */
 @layer utilities {
   
@@ -21,4 +31,12 @@
   .dark .neo-in {
     box-shadow: inset 4px 4px 8px #070a13, inset -4px -4px 8px #151e2f;
   }
+  /* كلاس لجعل القوائم قابلة للسحب أفقياً بدون إظهار شريط التمرير */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 }

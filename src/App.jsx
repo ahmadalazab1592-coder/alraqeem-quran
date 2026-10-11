@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Book, Quote, Type, Calculator, Plus, LayoutGrid, Mail, Sparkles, BookOpen, ArrowLeft, ChevronRight, ChevronLeft, X, BookmarkPlus, Save, Trash2, Eye, MessageSquare, Edit3, Scale, Hash, Layers, Search, BarChart3, AlertCircle, ListFilter, Library, Network, Users, Sun, Moon, Info, CheckCircle2, Star, Globe, Crown, Heart, Cloud, User, Clock, ScrollText , Share2, Download , GitMerge, AlertTriangle, Copy } from 'lucide-react';
+import { Book, Quote, Type, Hand, Calculator, Plus, LayoutGrid, Mail, Sparkles, BookOpen, ArrowLeft, ChevronRight, ChevronLeft, X, BookmarkPlus, Save, Trash2, Eye, MessageSquare, Edit3, Scale, Hash, Layers, Search, BarChart3, AlertCircle, ListFilter, Library, Network, Users, Sun, Moon, Info, CheckCircle2, Star, Globe, Crown, Heart, Cloud, User, Clock, ScrollText , Share2, Download , GitMerge, AlertTriangle, Copy } from 'lucide-react';
 
 // استدعاء قواعد البيانات من الملفات المنفصلة
 import quranDatabase from './data/quran.json';
@@ -245,6 +245,17 @@ const segmentColors = [
 
 const AYAHS_PER_PAGE = 30;
 
+// دالة فحص العدد الأولي
+const isPrime = (num) => {
+  if (num <= 1) return false;
+  if (num <= 3) return true;
+  if (num % 2 === 0 || num % 3 === 0) return false;
+  for (let i = 5; i * i <= num; i += 6) {
+    if (num % i === 0 || num % (i + 2) === 0) return false;
+  }
+  return true;
+};
+
 // ==========================================
 // 3. التطبيق الأساسي
 // ==========================================
@@ -266,6 +277,7 @@ export default function App() {
 // مخزن تجميع النتائج المتعددة للتقرير
   const [stashedResults, setStashedResults] = useState([]);
   const [isCanvasModalOpen, setIsCanvasModalOpen] = useState(false);
+  
 
   const toggleFavoriteSurah = (surahId, e) => {
     e.stopPropagation(); // لمنع فتح السورة عند النقر على النجمة فقط
@@ -309,13 +321,16 @@ export default function App() {
   const [globalSearchResults, setGlobalSearchResults] = useState([]);
   const [hasActiveSearch, setHasActiveSearch] = useState(false);
   const [isMethodologyModalOpen, setIsMethodologyModalOpen] = useState(false); 
-// أضف هذا السطر مع بقية متغيرات الـ useState في الأعلى
+  // أضف هذا السطر مع بقية متغيرات الـ useState في الأعلى
   const [showSplash, setShowSplash] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false); // 🌟 أضف هذا السطر
-  const [selectionMode, setSelectionMode] = useState('word');
+  // بدلاً من: const [selectionMode, setSelectionMode] = useState('word');
+  const [selectionMode, setSelectionMode] = useState('none'); // 'none' يعني وضع التصفح
   const [selectedWords, setSelectedWords] = useState(new Set());
   const [selectedAyahs, setSelectedAyahs] = useState(new Set());
   const [baseSelectionIndices, setBaseSelectionIndices] = useState([]);
+  const [exportBtnText, setExportBtnText] = useState("تصدير اللوحة كصورة");
+  const [exportStatus, setExportStatus] = useState('idle'); // الحالات: 'idle' | 'loading' | 'success' | 'error'
   
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartId, setDragStartId] = useState(null);
@@ -335,6 +350,39 @@ export default function App() {
   const [savedDiscoveries, setSavedDiscoveries] = useState([]);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
+  // متغيرات تتبع شريط أدوات التحديد
+  const toolsScrollRef = React.useRef(null);
+  const [showLeftArrow, setShowLeftArrow] = React.useState(true);
+  const [showRightArrow, setShowRightArrow] = React.useState(false);
+
+  const handleToolsScroll = () => {
+    if (toolsScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = toolsScrollRef.current;
+      // إذا كان الشاشة واسعة بما يكفي لتعرض كل الأزرار، أخفِ الأسهم
+      if (scrollWidth <= clientWidth) {
+        setShowLeftArrow(false);
+        setShowRightArrow(false);
+        return;
+      }
+      
+      // حساب التمرير للغة العربية (RTL)
+      const absScroll = Math.abs(Math.round(scrollLeft));
+      const maxScroll = scrollWidth - clientWidth;
+      
+      setShowRightArrow(absScroll > 2); // يظهر السهم الأيمن إذا سحبنا قليلاً لليسار
+      setShowLeftArrow(absScroll < maxScroll - 2); // يظهر الأيسر ما دمنا لم نصل لنهاية الشريط
+    }
+  };
+
+  // تفعيل الفحص عند تحميل التطبيق أو تغيير الأزرار
+  React.useEffect(() => {
+    const timer = setTimeout(handleToolsScroll, 150);
+    window.addEventListener('resize', handleToolsScroll);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleToolsScroll);
+    };
+  }, [selectedWords, selectedAyahs]);
 
 const handleAddToStash = () => {
     const scope = getSearchScope();
@@ -399,17 +447,22 @@ const handleAddToStash = () => {
     alert("تمت الإضافة إلى التقرير المجمع بنجاح!"); 
   };
 
-// 🌟 دالة تصدير اللوحة الفنية كصورة (بخلفية إسلامية "نجمة ثمانية" وبدون تشوهات)
+// 🌟 دالة تصدير اللوحة الفنية كصورة (بخلفية خطوط هادئة وتفاعل ذكي للزر)
   const handleExportCanvas = async () => {
+    // 1. تفعيل حالة التحميل
+    setExportStatus('loading');
+
     const canvasElement = document.getElementById('export-canvas-container');
-    if (!canvasElement) return;
+    if (!canvasElement) {
+      setExportStatus('idle');
+      return;
+    }
 
     try {
-      const exportBgColor = isDarkMode ? '#0f172a' : '#fdfbf7'; 
-      const patternOpacity = isDarkMode ? '0.05' : '0.08';
+      const exportBgColor = isDarkMode ? '#0f172a' : '#fafafa'; 
+      const patternOpacity = isDarkMode ? '0.04' : '0.06';
       
-      // 🌟 زخرفة إسلامية حقيقية (النجمة الثمانية / ربع الحزب) بدلاً من النمط السابق
-      const bgPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23d4af37' stroke-opacity='${patternOpacity}' stroke-width='1.5'%3E%3Cpath d='M15 15h30v30H15z'/%3E%3Cpath d='M30 8.787l21.213 21.213-21.213 21.213L8.787 30 30 8.787z'/%3E%3C/g%3E%3C/svg%3E")`;
+      const bgPattern = `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40' stroke='%23d4af37' stroke-opacity='${patternOpacity}' stroke-width='1' fill='none'/%3E%3C/svg%3E")`;
 
       const canvas = await html2canvas(canvasElement, {
         scale: 3, 
@@ -417,31 +470,23 @@ const handleAddToStash = () => {
         backgroundColor: exportBgColor,
         logging: false,
         onclone: (clonedDoc) => {
-            // 🌟 استخدام طريقة الحقن الآمنة (Style Injection) لمنع تشوه العناصر والبطاقات
             const style = clonedDoc.createElement('style');
             style.innerHTML = `
-              /* إزالة ظلال النصوص لمنع تشوه الخط القرآني */
               * { text-shadow: none !important; letter-spacing: normal !important; }
-              
-              /* تطبيق الزخرفة الإسلامية على الخلفية */
               #export-canvas-container { 
                   background-color: ${exportBgColor} !important;
                   background-image: ${bgPattern} !important;
-                  border: 2px solid rgba(212, 175, 55, 0.4) !important;
+                  border: 1px solid rgba(212, 175, 55, 0.2) !important;
               }
-              
-              /* تحويل البطاقات البارزة لتصميم مسطح ملكي ثابت */
               .neo-out { 
-                  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.25) !important; 
-                  border: 1px solid rgba(212, 175, 55, 0.4) !important; 
+                  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, ${isDarkMode ? '0.5' : '0.08'}) !important; 
+                  border: 1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'} !important; 
                   background-color: ${isDarkMode ? '#1e293b' : '#ffffff'} !important; 
               }
-              
-              /* تحويل البطاقات الغائرة لتصميم مسطح أنيق */
               .neo-in { 
                   box-shadow: none !important; 
-                  border: 1px solid rgba(150, 150, 150, 0.15) !important; 
-                  background-color: ${isDarkMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)'} !important; 
+                  border: 1px dashed ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'} !important; 
+                  background-color: ${isDarkMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(248, 250, 252, 0.8)'} !important; 
               }
             `;
             clonedDoc.head.appendChild(style);
@@ -454,9 +499,18 @@ const handleAddToStash = () => {
       link.download = `تقرير_الرقيم_${Date.now()}.png`;
       link.click();
       
+      // 2. تفعيل حالة النجاح (اللون الأخضر والنص الجديد)
+      setExportStatus('success');
+      
     } catch (error) {
       console.error("Error exporting image:", error);
-      alert("عذراً، حدث خطأ أثناء تصدير الصورة.");
+      // تفعيل حالة الخطأ في حال فشل التصدير
+      setExportStatus('error');
+    } finally {
+      // 3. العودة للحالة الافتراضية بعد ثانيتين فقط
+      setTimeout(() => {
+        setExportStatus('idle');
+      }, 2000);
     }
   };
   
@@ -598,6 +652,8 @@ const handleAddToStash = () => {
     }
     return flatWords; 
   };
+
+
   // 🌟 دالة لنسخ النص القرآني المحدد
   const handleCopySelectedText = () => {
     const scope = getSearchScope();
@@ -612,16 +668,39 @@ const handleAddToStash = () => {
   };
 
   const getDiscoveryTextSnippet = (segment) => flatWords.slice(segment.startIndex, segment.endIndex + 1).map(fw => fw.text).join(' ');
+  // =========================================================================
+  // دالة مخصصة لعمليات البحث فقط (معزولة تماماً عن حسابات الجُمّل والأرقام)
+  // تقوم بتوحيد الحروف وإزالة التشكيل لكي تتطابق كتابة المستخدم مع الرسم العثماني
+  // =========================================================================
+// 1. التجريد الذكي (مع الحفاظ على المسافات لمنع التداخل والسماح بالبحث عن جمل)
+  const normalizeForSearch = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/[\u0610-\u061A\u064B-\u065F\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED\u0670]/g, '')
+      .replace(/[ء]/g, '') // حذف الهمزة المفردة لتسهيل التطابق
+      .replace(/[أإآٱ]/g, 'ا')
+      .replace(/[ىيئ]/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/ؤ/g, 'و')
+      // إضافة \s هنا هي السر! للحفاظ على المسافات بين الكلمات
+      .replace(/[^\u0621-\u063A\u0641-\u064A\s]/g, '') 
+      .replace(/\s+/g, ' ') // توحيد المسافات الزائدة
+      .trim();
+  };
 
+  // 2. محرك البحث (العودة للبحث في النص كاملاً بعد تأمين المسافات)
   const handleGlobalSearch = (query) => {
     setGlobalSearchQuery(query);
     if (!query.trim()) { setGlobalSearchResults([]); return; }
     
-    const cleanQuery = stripDiacritics(query);
+    const cleanQuery = normalizeForSearch(query);
     const results = [];
+    
     for (const surah of quranDatabase) {
         for (const ayah of surah.ayahs) {
-            const cleanAyah = stripDiacritics(ayah.text);
+            const cleanAyah = normalizeForSearch(ayah.text);
+            
+            // عادت الدالة للبحث الشامل، وبفضل المسافة "ما لونها" لن تطابق "مالون"
             if (cleanAyah.includes(cleanQuery)) {
                 results.push({
                     surahId: parseInt(surah.id),
@@ -635,6 +714,45 @@ const handleAddToStash = () => {
         if (results.length > 60) break;
     }
     setGlobalSearchResults(results);
+  };
+
+  // 3. دالة تظليل وتلوين نتيجة البحث داخل النص القرآني الأصلي
+  const renderHighlightedText = (text, query) => {
+    if (!query.trim()) return text;
+    const cleanQuery = normalizeForSearch(query);
+    if (!cleanQuery) return text;
+
+    try {
+      // تحويل كلمة البحث إلى نمط (Regex) يتجاهل التشكيل والرموز بين الحروف
+      const chars = cleanQuery.split('').map(c => {
+        if (c === ' ') return '\\s+';
+        if (c === 'ا') return '[اأإآٱء\\u0654]'; // يشمل الهمزة العلوية
+        if (c === 'ي') return '[يىئ]';
+        if (c === 'ه') return '[ةه]';
+        if (c === 'و') return '[ؤو]';
+        return c;
+      });
+      
+      // السماح بوجود أي تشكيل أو تطويل بين الحروف الأساسية
+      const joiner = '[^\\u0621-\\u063A\\u0641-\\u064A\\s]*';
+      const regex = new RegExp(`(${chars.join(joiner)})`, 'g');
+
+      // تقسيم النص وإبراز الجزء المطابق
+      const parts = text.split(regex);
+      return parts.map((part, i) => {
+        // الأجزاء المطابقة تكون دائماً في الفهارس الفردية (1, 3, 5...)
+        if (i % 2 === 1) {
+          return (
+            <span key={i} className="bg-[#d4af37]/20 text-[#b48f27] dark:text-[#d4af37] rounded-lg px-1.5 py-0.5 mx-0.5 border-b-2 border-[#d4af37]/50 transition-colors">
+              {part}
+            </span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      });
+    } catch (e) {
+      return text; // في حال حدوث خطأ، نعرض النص كما هو
+    }
   };
 
   const goToGlobalResult = (result) => {
@@ -888,7 +1006,7 @@ const handleAddToStash = () => {
     }, 600);
   };
 
-  const handleDragStart = (wordId) => {
+const handleDragStart = (wordId) => {
     if (selectionMode !== 'word' || discoveries.length > 0) return;
     setIsDragging(true);
     setDragStartId(wordId);
@@ -915,12 +1033,19 @@ const handleAddToStash = () => {
 
     const newSelection = new Set();
     
-    // إضافة التحديدات السابقة للحفاظ على التحديد المتقطع
+    // 🌟 السر هنا: معرفة ما إذا كانت الكلمة الأولى في السحب محددة مسبقاً أم لا
+    const isDeselecting = baseSelectionIndices.includes(dragStartIndex);
+
+    // إضافة التحديدات السابقة كقاعدة
     baseSelectionIndices.forEach(idx => newSelection.add(flatWordIds[idx]));
 
-    // إضافة التحديد الحالي بناءً على السحب
+    // التعديل الذكي بناءً على حالة السحب (إضافة أو إلغاء)
     for (let i = dragMin; i <= dragMax; i++) {
-        newSelection.add(flatWordIds[i]);
+        if (isDeselecting) {
+            newSelection.delete(flatWordIds[i]); // التراجع عن التحديد
+        } else {
+            newSelection.add(flatWordIds[i]); // تحديد جديد
+        }
     }
 
     setSelectedWords(newSelection);
@@ -938,8 +1063,10 @@ const handleAddToStash = () => {
     }
   };
   
+  // 🌟 تصحيح المتغير هنا من word إلى wordId ليعمل النقر المفرد
   const handleWordClick = (wordId) => {
-    if (selectionMode !== 'word' || discoveries.length > 0) return;
+    // 🌟 التعديل هنا: إيقاف تحديد الكلمات إذا كنا في التصفح الحر أو وضع تحديد الآيات
+    if (selectionMode === 'none' || selectionMode === 'ayah') return;
     if (dragMoved) return; 
 
     const newSelection = new Set(selectedWords);
@@ -954,9 +1081,15 @@ const handleAddToStash = () => {
 
   const handleAyahClick = (ayahId) => {
     if (selectionMode !== 'ayah' || discoveries.length > 0) return;
+    
     const newSelection = new Set(selectedAyahs);
-    if (newSelection.has(ayahId)) newSelection.delete(ayahId); else newSelection.add(ayahId);
-    setSelectedAyahs(newSelection); setStatsData(null);
+    if (newSelection.has(ayahId)) {
+        newSelection.delete(ayahId); 
+    } else {
+        newSelection.add(ayahId);
+    }
+    setSelectedAyahs(newSelection); 
+    setStatsData(null);
   };
 
   const openCommentModal = () => {
@@ -1267,11 +1400,21 @@ const handleAddToStash = () => {
               />
             </div>
             
+            {/* 🌟 عدّاد نتائج البحث الجديد (يظهر هنا بين مربع البحث والنتائج) */}
+            {globalSearchQuery.trim() !== '' && (
+              <div className={`mb-4 text-center font-bold text-sm md:text-base ${t.textMuted} flex items-center justify-center gap-2 shrink-0`}>
+                <span className={`w-2 h-2 rounded-full ${globalSearchResults.length > 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                {globalSearchResults.length > 0 
+                  ? `تم العثور على ${globalSearchResults.length} نتيجة` 
+                  : 'لا توجد نتائج مطابقة لبحثك'}
+              </div>
+            )}
+            
             <div className="flex-grow overflow-y-auto custom-scrollbar space-y-4 pr-2">
               {globalSearchQuery.trim() === '' ? (
                  <div className={`text-center font-bold ${t.textMuted} py-10`}>اكتب كلمة للبدء بالبحث في جميع السور...</div>
               ) : globalSearchResults.length === 0 ? (
-                 <div className={`text-center font-bold ${t.textMuted} py-10`}>لا توجد نتائج مطابقة لبحثك.</div>
+                 <div className={`text-center font-bold ${t.textMuted} py-10`}>تأكد من الإملاء وحاول بكلمة أخرى.</div>
               ) : (
                 globalSearchResults.map((result, idx) => (
                   <button key={idx} onClick={() => goToGlobalResult(result)} className={`w-full text-right p-5 md:p-6 rounded-2xl transition-all neo-out active:neo-in group`}>
@@ -1284,7 +1427,8 @@ const handleAddToStash = () => {
                        </span>
                     </div>
                     <p className={`font-bold text-lg md:text-xl leading-loose ${t.text} group-hover:text-cyan-800 dark:group-hover:text-cyan-300 transition-colors`} style={{ fontFamily: "'Amiri Quran', serif" }}>
-                      {result.text}
+                     {/* تفعيل التظليل الذكي هنا */}
+                      {renderHighlightedText(result.text, globalSearchQuery)}
                     </p>
                   </button>
                 ))
@@ -1457,8 +1601,8 @@ const handleAddToStash = () => {
                         <h5 className="text-[#b48f27] dark:text-[#d4af37] font-bold text-base mb-3">2. الهمزة المفردة (على السطر):</h5>
                         <p className={`${t.textMuted} font-medium mb-4`}>هناك أمثلة وحالات كثيرة لا تُعتبر فيها الهمزة المفردة (ء) حرفاً أصيلاً، بل مجرد علامة ضبط تُتجاهل برمجياً في الحساب، وتشمل:</p>
                         <ul className="space-y-4">
-                           <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في وسط الكلمة (بدون نبرة):</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (السيءات، يجءرون، تجءروا، الءن، هنيءا، مريءا، متكءين، يتكءون، أفءدتهم، أفءدة، يستءخرون، خطيءة، خطءا، خطيءتهم، ليسءوا، فمالءون، المشءمة).</span></div></li>
-                           <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في بداية الكلمة (على السطر):</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (ءامن، ءامنوا، ءامنا، ءادم، قرءان، القرءان، ءاخر، ءاخرين، ءاخرنا). وتتميز بأنها تسقط عند دخول حرف ملتصق بالكلمة لأنها ليست حرفاً أصيلاً.</span></div></li>
+                           <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في وسط الكلمة (بدون نبرة):</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (السيءات， يجءرون， تجءروا， الءن ， القرءان ， قرءان ， هنيءا， مريءا， متكءين， يتكءون， أفءدتهم， أفءدة， يستءخرون， خطيءة， خطءا， خطيءتهم， ليسءوا， فمالءون， المشءمة).</span></div></li>
+                           <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في بداية الكلمة (على السطر):</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (ءامن، ءامنوا، ءامنا، ءادم، ءاخر، ءاخرين، ءاخرنا). وتتميز بأنها تسقط عند دخول حرف ملتصق بالكلمة لأنها ليست حرفاً أصيلاً.</span></div></li>
                            <li className="flex items-start"><span className="text-rose-500 ml-3 mt-1 text-xl">•</span><div><strong className={`${t.text}`}>في نهاية الكلمة:</strong><br/><span className={`${t.textMuted} text-xs md:text-sm mt-1 block leading-relaxed`}>أمثلة: (شيء، بريء، الخبء، دفء). والسبب أنه بدخول حرف على نهاية الكلمة (التنوين) يسقط الكرسي وتكتب بدون نبرة مثل: (شيءا، بريءا).</span></div></li>
                         </ul>
                      </div>
@@ -1490,39 +1634,60 @@ const handleAddToStash = () => {
       
 {/* -------------------- شريط القائمة الرئيسي (يظهر فقط في شاشة المصحف) -------------------- */}
       {activeTab === 'main' && (
-        <div className={`sticky top-0 z-40 neo-out border-t-0 rounded-b-3xl px-3 md:px-6 py-1.5 md:py-2 flex flex-col md:flex-row justify-between items-center gap-2 md:gap-3 transition-all duration-300`}>
-           <div className="text-center md:text-right flex items-center gap-3">
+        <div className={`sticky top-0 z-40 neo-out border-t-0 rounded-b-2xl md:rounded-b-3xl px-3 md:px-6 py-2 md:py-3 flex flex-col md:flex-row justify-between items-center gap-3 transition-all duration-300`}>
+           
+           {/* 🌟 الصف الأول في الهاتف: الشعار يميناً والأدوات يساراً (لتوفير المساحة) */}
+           <div className="w-full md:w-auto flex justify-between items-center">
               <div>
-                 {/* 🌟 تم استخدام {t.text} لضمان التغير الجذري للون الرقيم مع زر التطبيق */}
-                 <h1 className={`text-xl md:text-2xl font-bold ${t.text}`}>
-                   الرَّقِيم <span className="text-xs md:text-sm text-cyan-600 dark:text-cyan-400 font-normal">منظومة الأعداد في القرآن الكريم</span>
+                 <h1 className={`text-lg md:text-2xl font-bold ${t.text}`}>
+                   الرَّقِيم <span className="hidden sm:inline-block text-[10px] md:text-sm text-cyan-600 dark:text-cyan-400 font-normal mr-1">منظومة الأعداد في القرآن الكريم</span>
                  </h1>
                  <p className={`text-slate-500 dark:text-slate-400 text-[9px] md:text-[11px] flex items-center mt-0.5 font-bold`}>
                    {selectedWords.size > 0 || selectedAyahs.size > 0 ? <><AlertCircle className="w-3 h-3 text-cyan-500 ml-1"/> البحث: يدوي</> : <><BookOpen className="w-3 h-3 text-[#d4af37] ml-1"/> البحث: كامل الصفحة</>}
                  </p>
               </div>
-              <button onClick={() => setIsFullIndexOpen(true)} className={`neo-out active:neo-in text-indigo-600 dark:text-indigo-400 p-2 md:p-2.5 rounded-xl transition-all`} title="الفهرس الشامل">
-                <LayoutGrid className="w-4 h-4 md:w-5 md:h-5" />
+
+              {/* أزرار الأدوات المصغرة (تظهر هنا في الهاتف فقط لسهولة الوصول، وتُخفى في الديسكتوب) */}
+              <div className="flex md:hidden items-center gap-1.5">
+                <button onClick={() => setIsGlobalSearchModalOpen(true)} className={`neo-out active:neo-in text-cyan-600 dark:text-cyan-400 p-1.5 rounded-xl transition-all`}>
+                    <Search className="w-4 h-4" />
+                 </button>
+                 <button onClick={() => setActiveTab('encyclopedia')} className={`neo-out active:neo-in text-[#d4af37] p-1.5 rounded-xl transition-all`}>
+                    <Library className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setIsMethodologyModalOpen(true)} className={`neo-out active:neo-in text-cyan-600 dark:text-cyan-400 p-1.5 rounded-xl transition-all`}>
+                    <Info className="w-4 h-4" />
+                 </button>
+                 <button onClick={() => setIsDarkMode(!isDarkMode)} className={`neo-out active:neo-in p-1.5 rounded-xl transition-all`}>
+                     {isDarkMode ? <Sun className="w-4 h-4 text-[#d4af37]" /> : <Moon className="w-4 h-4 text-indigo-600" />}
+                 </button>
+              </div>
+           </div>
+           
+           {/* 🌟 الصف الثاني في الهاتف: زر السورة والفهرس يأخذان العرض بالكامل */}
+           <div className="w-full md:w-auto flex items-center justify-between gap-2">
+              <button onClick={() => setIsFullIndexOpen(true)} className={`shrink-0 neo-out active:neo-in text-indigo-600 dark:text-indigo-400 p-2 md:p-2.5 rounded-xl transition-all`} title="الفهرس الشامل">
+                <LayoutGrid className="w-5 h-5 md:w-5 md:h-5" />
               </button>
-              <button onClick={() => setIsSurahModalOpen(true)} className={`neo-out active:neo-in rounded-xl px-3 py-1.5 md:px-4 md:py-2 transition-all flex items-center`}>
-                {/* 🌟 تم استخدام {t.text} هنا أيضاً لاسم السورة */}
-                <span className={`font-bold text-base md:text-lg pt-1 ${t.text}`} style={{ fontFamily: "'Amiri Quran', serif" }}>سورة {currentSurah.name}</span>
+              <button onClick={() => setIsSurahModalOpen(true)} className={`flex-1 md:flex-none justify-center neo-out active:neo-in rounded-xl px-3 py-1.5 md:px-4 md:py-2 transition-all flex items-center`}>
+                <span className={`font-bold text-sm md:text-lg pt-1 ${t.text}`} style={{ fontFamily: "'Amiri Quran', serif" }}>سورة {currentSurah.name}</span>
                 <span className={`text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mr-2 font-sans`}>({currentSurah.total_ayahs} آية)</span>
               </button>
            </div>
            
-           <div className="flex items-center flex-wrap justify-center gap-2">
+           {/* 🌟 أزرار الأدوات الكاملة (تظهر في الديسكتوب فقط وتحتوي على النصوص) */}
+           <div className="hidden md:flex items-center flex-wrap justify-center gap-2">
              <button onClick={() => setIsDarkMode(!isDarkMode)} className={`neo-out active:neo-in p-2 md:p-2.5 rounded-xl transition-all`} title="تغيير المظهر">
                  {isDarkMode ? <Sun className="w-4 h-4 md:w-5 md:h-5 text-[#d4af37]" /> : <Moon className="w-4 h-4 md:w-5 md:h-5 text-indigo-600" />}
              </button>
              <button onClick={() => setIsMethodologyModalOpen(true)} className={`neo-out active:neo-in text-cyan-600 dark:text-cyan-400 px-3 py-1.5 md:px-3 md:py-2 rounded-xl flex items-center gap-1.5 text-sm md:text-base font-bold transition-all`}>
-                <Info className="w-4 h-4" /> <span className="hidden md:inline">عن التطبيق</span>
+                <Info className="w-4 h-4" /> <span>عن التطبيق</span>
              </button>
              <button onClick={() => setIsGlobalSearchModalOpen(true)} className={`neo-out active:neo-in text-cyan-600 dark:text-cyan-400 px-3 py-1.5 md:px-3 md:py-2 rounded-xl flex items-center gap-1.5 text-sm md:text-base font-bold transition-all`}>
-                <Search className="w-4 h-4" /> <span className="hidden md:inline">بحث</span>
+                <Search className="w-4 h-4" /> <span>بحث</span>
              </button>
              <button onClick={() => setActiveTab('encyclopedia')} className={`neo-out active:neo-in text-[#d4af37] px-3 py-1.5 md:px-3 md:py-2 rounded-xl flex items-center gap-1.5 text-sm md:text-base font-bold transition-all`}>
-                <Library className="w-4 h-4" /> <span className="hidden md:inline">الموسوعة</span>
+                <Library className="w-4 h-4" /> <span>الموسوعة</span>
               </button>
            </div>
         </div>
@@ -1545,7 +1710,7 @@ const handleAddToStash = () => {
         
         {/* الشاشة 1: المصحف الأساسي */}
         {activeTab === 'main' && (
-          <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 relative z-10 animate-fade-in-up">
+          <div className="font-amiri p-4 md:p-8 max-w-5xl mx-auto space-y-6 relative z-10 animate-fade-in-up">
             
 {/* 🌟 شريط التنقل بين الصفحات (بتصميم النيومورفيزم) */}
           {totalPages > 1 && (
@@ -1590,105 +1755,163 @@ const handleAddToStash = () => {
             </div>
           )}
 
-{/* لوحة الإحصاء اليدوي */}
+{/* ----------------- لوحة الإحصاء اليدوي ----------------- */}
             {statsData && discoveries.length === 0 && (
-               <div id="results-panel" className={`neo-out rounded-3xl p-6 mb-8 animate-fade-in-up`}>
-                  <div className={`flex justify-between items-center mb-6 border-b ${t.border} pb-4`}>
-                   <h3 className={`font-bold ${t.text} text-xl flex items-center`}><BarChart3 className="w-6 h-6 ml-2 text-[#d4af37]"/> إحصاء النص</h3>
-                   <button onClick={() => { setStatsData(null); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text} neo-out rounded-full p-2`}><X className="w-5 h-5"/></button>
+               <div id="results-panel" className={`neo-out rounded-2xl md:rounded-3xl p-4 md:p-6 mb-8 animate-fade-in-up`}>
+                  <div className={`flex justify-between items-center mb-4 md:mb-6 border-b ${t.border} pb-3 md:pb-4`}>
+                   <h3 className={`font-bold ${t.text} text-lg md:text-xl flex items-center`}><BarChart3 className="w-5 h-5 md:w-6 md:h-6 ml-2 text-[#d4af37]"/> إحصاء النص</h3>
+                   <button onClick={() => { setStatsData(null); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text} neo-out rounded-full p-1.5 md:p-2`}><X className="w-4 h-4 md:w-5 md:h-5"/></button>
                  </div>
-                 <div className="grid grid-cols-3 gap-4 mb-8">
-                    <div className={`neo-in p-5 rounded-2xl text-center`}><p className={`${t.textMuted} text-sm mb-2 font-bold`}>الكلمات</p><p className={`text-3xl font-black ${t.text}`}>{statsData.words}</p></div>
-                    <div className={`neo-in p-5 rounded-2xl text-center ${statsData.is19Letters ? 'border border-[#d4af37]/50' : ''}`}><p className={`${t.textMuted} text-sm mb-2 font-bold`}>الحروف</p><p className={`text-3xl font-black ${statsData.is19Letters ? 'text-[#d4af37]' : t.text}`}>{statsData.letters}</p>{statsData.is19Letters && <span className="text-[11px] font-bold text-[#d4af37] block mt-2 bg-[#d4af37]/10 rounded-md py-1">19 × {statsData.letters/19}</span>}</div>
-                    <div className={`neo-in p-5 rounded-2xl text-center ${statsData.is19Value ? 'border border-[#d4af37]/50' : ''}`}><p className={`${t.textMuted} text-sm mb-2 font-bold`}>القيمة العددية</p><p className={`text-3xl font-black ${statsData.is19Value ? 'text-[#d4af37]' : t.text}`}>{statsData.value}</p>{statsData.is19Value && <span className="text-[11px] font-bold text-[#d4af37] block mt-2 bg-[#d4af37]/10 rounded-md py-1">19 × {statsData.value/19}</span>}</div>
+                 
+                 <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8">
+                    
+                    {/* الكلمات */}
+                    <div className={`neo-in p-3 md:p-5 rounded-xl md:rounded-2xl text-center flex flex-col justify-center`}>
+                      <p className={`${t.textMuted} text-[11px] md:text-sm mb-1 md:mb-2 font-bold`}>الكلمات</p>
+                      <p className={`text-xl md:text-3xl font-black ${t.text} flex justify-center items-center gap-1`}>
+                        {statsData.words}
+                        {isPrime(statsData.words) && <span className="text-amber-500 text-sm md:text-lg" title="عدد أولي">✨</span>}
+                      </p>
+                      {isPrime(statsData.words) && <span className="text-[10px] md:text-xs font-bold text-amber-500 block mt-1 md:mt-1.5">( عدد أولي )</span>}
+                    </div>
+                    
+                    {/* الحروف */}
+                    <div className={`neo-in p-3 md:p-5 rounded-xl md:rounded-2xl text-center flex flex-col justify-center ${statsData.is19Letters || isPrime(statsData.letters) ? 'border border-[#d4af37]/50' : ''}`}>
+                      <p className={`${t.textMuted} text-[11px] md:text-sm mb-1 md:mb-2 font-bold`}>الحروف</p>
+                      <p className={`text-xl md:text-3xl font-black ${statsData.is19Letters ? 'text-[#d4af37]' : t.text} flex justify-center items-center gap-1`}>
+                        {statsData.letters}
+                        {isPrime(statsData.letters) && <span className="text-amber-500 text-sm md:text-lg" title="عدد أولي">✨</span>}
+                      </p>
+                      {statsData.is19Letters && <span className="text-[9px] md:text-[11px] font-bold text-[#d4af37] block mt-1.5 md:mt-2 bg-[#d4af37]/10 rounded-md py-0.5 md:py-1">19 × {statsData.letters/19}</span>}
+                      {isPrime(statsData.letters) && <span className="text-[10px] md:text-xs font-bold text-amber-500 block mt-1 md:mt-1.5">( عدد أولي )</span>}
+                    </div>
+                    
+                    {/* القيمة العددية */}
+                    <div className={`neo-in p-3 md:p-5 rounded-xl md:rounded-2xl text-center flex flex-col justify-center ${statsData.is19Value || isPrime(statsData.value) ? 'border border-[#d4af37]/50' : ''}`}>
+                      <p className={`${t.textMuted} text-[11px] md:text-sm mb-1 md:mb-2 font-bold`}>القيمة العددية</p>
+                      <p className={`text-xl md:text-3xl font-black ${statsData.is19Value ? 'text-[#d4af37]' : t.text} flex justify-center items-center gap-1`}>
+                        {statsData.value}
+                        {isPrime(statsData.value) && <span className="text-amber-500 text-sm md:text-lg" title="عدد أولي">✨</span>}
+                      </p>
+                      {statsData.is19Value && <span className="text-[9px] md:text-[11px] font-bold text-[#d4af37] block mt-1.5 md:mt-2 bg-[#d4af37]/10 rounded-md py-0.5 md:py-1">19 × {statsData.value/19}</span>}
+                      {isPrime(statsData.value) && <span className="text-[10px] md:text-xs font-bold text-amber-500 block mt-1 md:mt-1.5">( عدد أولي )</span>}
+                    </div>
                  </div>
-                 <div className="flex flex-col md:flex-row gap-4">
-                   {(statsData.is19Letters || statsData.is19Value) && (
-                     <button onClick={() => openCommentModal()} className="flex-1 bg-[#d4af37] hover:bg-[#b48f27] text-white font-bold py-3.5 rounded-2xl flex justify-center items-center shadow-lg transition-colors"><BookmarkPlus className="w-5 h-5 ml-2" /> حفظ الإعجاز</button>
+                 
+                 <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+                   {(statsData.is19Letters || statsData.is19Value || isPrime(statsData.letters) || isPrime(statsData.value)) && (
+                     <button onClick={() => openCommentModal()} className="flex-1 bg-[#d4af37] hover:bg-[#b48f27] text-white font-bold py-2.5 md:py-3.5 rounded-xl md:rounded-2xl flex justify-center items-center shadow-lg transition-colors text-sm md:text-base">
+                       <BookmarkPlus className="w-4 h-4 md:w-5 md:h-5 ml-2" /> حفظ الإعجاز
+                     </button>
                    )}
-                   <button onClick={openDeepSearchConfig} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center transition-colors shadow-lg">
-                     <Search className="w-5 h-5 ml-2" /> بحث عن متطابقات (±3 صفحات)
+                   
+                   <button onClick={openDeepSearchConfig} className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 md:py-3.5 rounded-xl md:rounded-2xl flex justify-center items-center transition-colors shadow-lg text-sm md:text-base">
+                     <Search className="w-4 h-4 md:w-5 md:h-5 ml-2" /> بحث عن متطابقات (±3 صفحات)
                    </button>
                  </div>
                </div>
             )}
 
-            {/* لوحة الاستكشاف والتمشيط الذكي */}
+            {/* ----------------- لوحة الاستكشاف والتمشيط الذكي ----------------- */}
             {discoveries.length > 0 && (
-               <div id="results-panel" className={`${t.panel} border ${t.borderFocus} rounded-2xl p-4 md:p-5 mb-8 shadow-lg animate-fade-in-up overflow-hidden`}>
-                <div className={`flex flex-col md:flex-row justify-between items-center w-full mb-4 pb-4 border-b ${t.border} gap-4`}>
-                  <span className={`font-bold text-sm px-4 py-2 rounded-xl flex items-center ${t.text} ${t.input} border ${t.borderFocus}`}>
+               <div id="results-panel" className={`${t.panel} border ${t.borderFocus} rounded-2xl md:rounded-3xl p-3 md:p-5 mb-8 shadow-lg animate-fade-in-up overflow-hidden`}>
+                
+                {/* 🌟 الرأس (تم جعله متجاوباً flex-col للهاتف) */}
+                <div className={`flex flex-col md:flex-row justify-between items-start md:items-center w-full mb-4 pb-3 md:pb-4 border-b ${t.border} gap-3 md:gap-4`}>
+                  <span className={`font-bold text-xs md:text-sm px-3 md:px-4 py-2 rounded-xl flex items-center w-full md:w-auto justify-center md:justify-start ${t.text} ${t.input} border ${t.borderFocus}`}>
                     {discoveryMode === 'deep_search' ? (
-                       <><Layers className="w-4 h-4 ml-2 text-indigo-500" /> نتائج البحث العميق ({discoveries.length})</>
+                       <><Layers className="w-4 h-4 ml-1.5 md:ml-2 text-indigo-500" /> نتائج البحث العميق ({discoveries.length})</>
                     ) : (
                        <>
-                         {discoveryMode === '19_letters' && <Scale className="w-4 h-4 ml-2 text-emerald-500" />}
-                         {discoveryMode === '19_values' && <Hash className="w-4 h-4 ml-2 text-emerald-500" />}
-                         {(discoveryMode === 'balance_letters' || discoveryMode === 'balance_values') && <Scale className="w-4 h-4 ml-2 text-cyan-500" />}
+                         {discoveryMode === '19_letters' && <Scale className="w-4 h-4 ml-1.5 md:ml-2 text-emerald-500" />}
+                         {discoveryMode === '19_values' && <Hash className="w-4 h-4 ml-1.5 md:ml-2 text-emerald-500" />}
+                         {(discoveryMode === 'balance_letters' || discoveryMode === 'balance_values') && <Scale className="w-4 h-4 ml-1.5 md:ml-2 text-cyan-500" />}
                          {discoveryMode === '19_letters' ? 'حروف مضاعفات 19' : discoveryMode === '19_values' ? 'قيم مضاعفات 19' : discoveryMode === 'balance_letters' ? 'توازن الحروف' : 'توازن القيم'}
                          ({discoveries.length})
                        </>
                     )}
                   </span>
-                  <div className="flex gap-2">
-                    <button onClick={() => openCommentModal()} className="rounded-xl flex items-center text-xs px-4 py-2 font-bold transition-all bg-[#d4af37] text-white hover:bg-[#b48f27]"><BookmarkPlus className="w-4 h-4 ml-1" /> حفظ وتأمل</button>
-                    <button onClick={() => { setDiscoveries([]); setDiscoveryMode(null); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text} ${t.input} rounded-xl p-2`}><X className="w-5 h-5" /></button>
+                  
+                  <div className="flex gap-2 w-full md:w-auto justify-between md:justify-end">
+                    <button onClick={() => openCommentModal()} className="flex-1 md:flex-none rounded-xl flex justify-center items-center text-xs md:text-sm px-4 py-2 font-bold transition-all bg-[#d4af37] text-white hover:bg-[#b48f27]">
+                      <BookmarkPlus className="w-4 h-4 ml-1" /> حفظ وتأمل
+                    </button>
+                    <button onClick={() => { setDiscoveries([]); setDiscoveryMode(null); scrollToLastSelection(); }} className={`${t.textMuted} hover:${t.text} ${t.input} rounded-xl p-2 md:px-3`}>
+                      <X className="w-4 h-4 md:w-5 md:h-5" />
+                    </button>
                   </div>
                 </div>
                 
-                <div className="flex items-start justify-center gap-2 md:gap-4 w-full">
-                  <button onClick={() => setActiveDiscoveryIndex(prev => Math.min(prev + 1, discoveries.length - 1))} disabled={activeDiscoveryIndex === discoveries.length - 1} className={`p-2 md:p-3 ${t.input} ${t.textMuted} rounded-xl hover:${t.text} disabled:opacity-30 border ${t.borderFocus} mt-2`}><ChevronRight className="w-5 h-5" /></button>
-                  <div className="flex-1 w-full">
-                    <div className="text-center mb-3">
-                       <span className={`inline-block ${t.input} ${t.textMuted} text-xs px-3 py-1 rounded-full font-bold tracking-wider mb-2 border ${t.border}`}>
-                           نتيجة {activeDiscoveryIndex + 1} من {discoveries.length}
-                       </span>
-                       {discoveryMode === 'deep_search' && (
-                         <div className={`${t.input} border ${t.border} rounded-lg p-2 inline-block mx-auto text-sm ${t.textMuted} mr-2`}>
-                           نوع التطابق المكتشف: 
-                           <strong className={`ml-2 px-2 py-0.5 rounded ${discoveries[activeDiscoveryIndex].matchType.includes('الحروف') && discoveries[activeDiscoveryIndex].matchType.includes('القيمة') ? 'bg-indigo-500/20 text-indigo-600' : discoveries[activeDiscoveryIndex].matchType === 'الحروف' ? 'bg-cyan-500/20 text-cyan-600' : 'bg-[#d4af37]/20 text-[#d4af37]'}`}>
-                             {discoveries[activeDiscoveryIndex].matchType}
-                           </strong>
-                         </div>
-                       )}
-                    </div>
-                    
-                    <div className={discoveryMode === 'deep_search' ? "grid grid-cols-1 md:grid-cols-2 gap-4 w-full" : "flex flex-col gap-4 w-full"}>
-                      {discoveries[activeDiscoveryIndex].segments.map((seg, idx) => {
-                        const color = segmentColors[idx % segmentColors.length];
-                        const matchType = discoveries[activeDiscoveryIndex].matchType || '';
-                        
-                        const highlightLetters = discoveryMode === 'deep_search' && (matchType === 'الحروف' || matchType === 'الحروف والقيمة معاً');
-                        const highlightValue = discoveryMode === 'deep_search' && (matchType === 'القيمة' || matchType === 'الحروف والقيمة معاً');
-
-                        return (
-                          <div key={idx} className={`flex flex-col gap-4 p-4 md:p-5 rounded-2xl border ${discoveryMode === 'deep_search' ? (seg.isPrimary ? `border-indigo-500/50 ${isDarkMode ? 'bg-indigo-950/20' : 'bg-indigo-50/50'}` : `${t.borderFocus} ${t.input}`) : `${t.borderFocus} ${t.input}`} relative h-full`}>
-                             <div className={`flex items-center gap-3 flex-wrap border-b ${t.border} pb-3`}>
-                                {discoveryMode === 'deep_search' ? (
-                                   <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg ${seg.isPrimary ? 'bg-indigo-600 text-white' : 'bg-slate-500 text-white'}`}>
-                                     {seg.isPrimary ? 'النص الأساسي المكتشف' : 'النص المتطابق'}
-                                   </span>
-                                ) : (
-                                   (discoveryMode === 'balance_letters' || discoveryMode === 'balance_values') && <span className={`text-[10px] font-bold px-3 py-1.5 rounded-lg ${color.badge}`}>النص {idx + 1}</span>
-                                )}
-                                
-                                <span className={`text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg border transition-colors ${highlightLetters ? 'bg-cyan-500/20 text-cyan-600 border-cyan-500/50' : `${t.textMuted} ${t.panel} ${t.borderFocus}`}`}>
-                                   {seg.letterCount} حرف
-                                </span>
-                                <span className={`text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg border transition-colors ${highlightValue ? 'bg-[#d4af37]/20 text-[#d4af37] border-[#d4af37]/50' : `${t.textMuted} ${t.panel} ${t.borderFocus}`}`}>
-                                   قيمة {seg.sum}
-                                </span>
-                                {discoveryMode === '19_letters' && <span className="text-xs md:text-sm font-bold text-emerald-600 bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/30">19 × {seg.letterCount / 19}</span>}
-                                {discoveryMode === '19_values' && <span className="text-xs md:text-sm font-bold text-emerald-600 bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/30">19 × {seg.sum / 19}</span>}
-                             </div>
-                             <p className={`font-['Amiri_Quran'] text-2xl md:text-3xl leading-[4.5rem] md:leading-[5rem] ${t.quranText} pt-2 pb-2 px-2 overflow-visible`}>"{getDiscoveryTextSnippet(seg)}"</p>
-                          </div>
-                        )
-                      })}
-                    </div>
+                {/* 🌟 منطقة المحتوى (أخذت العرض بالكامل 100%) */}
+                <div className="w-full">
+                  <div className="text-center mb-3">
+                     {discoveryMode === 'deep_search' && (
+                       <div className={`${t.input} border ${t.border} rounded-lg p-2 inline-block mx-auto text-xs md:text-sm ${t.textMuted}`}>
+                         نوع التطابق: 
+                         <strong className={`ml-1.5 md:ml-2 px-2 py-0.5 rounded ${discoveries[activeDiscoveryIndex].matchType.includes('الحروف') && discoveries[activeDiscoveryIndex].matchType.includes('القيمة') ? 'bg-indigo-500/20 text-indigo-600' : discoveries[activeDiscoveryIndex].matchType === 'الحروف' ? 'bg-cyan-500/20 text-cyan-600' : 'bg-[#d4af37]/20 text-[#d4af37]'}`}>
+                           {discoveries[activeDiscoveryIndex].matchType}
+                         </strong>
+                       </div>
+                     )}
                   </div>
-                  <button onClick={() => setActiveDiscoveryIndex(prev => Math.max(prev - 1, 0))} disabled={activeDiscoveryIndex === 0} className={`p-2 md:p-3 ${t.input} ${t.textMuted} rounded-xl hover:${t.text} disabled:opacity-30 border ${t.borderFocus} mt-2`}><ChevronLeft className="w-5 h-5" /></button>
+                  
+                  {/* البطاقات */}
+                  <div className={discoveryMode === 'deep_search' ? "grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 w-full" : "flex flex-col gap-3 md:gap-4 w-full"}>
+                    {discoveries[activeDiscoveryIndex].segments.map((seg, idx) => {
+                      const color = segmentColors[idx % segmentColors.length];
+                      const matchType = discoveries[activeDiscoveryIndex].matchType || '';
+                      
+                      const highlightLetters = discoveryMode === 'deep_search' && (matchType === 'الحروف' || matchType === 'الحروف والقيمة معاً');
+                      const highlightValue = discoveryMode === 'deep_search' && (matchType === 'القيمة' || matchType === 'الحروف والقيمة معاً');
+
+                      return (
+                        <div key={idx} className={`flex flex-col gap-3 md:gap-4 p-3 md:p-5 rounded-2xl border ${discoveryMode === 'deep_search' ? (seg.isPrimary ? `border-indigo-500/50 ${isDarkMode ? 'bg-indigo-950/20' : 'bg-indigo-50/50'}` : `${t.borderFocus} ${t.input}`) : `${t.borderFocus} ${t.input}`} relative h-full`}>
+                           {/* 🌟 الشارات التعريفية */}
+                           <div className={`flex items-center justify-center md:justify-start gap-2 flex-wrap border-b ${t.border} pb-3`}>
+                              {discoveryMode === 'deep_search' ? (
+                                 <span className={`text-[9px] md:text-[10px] font-bold px-2 md:px-3 py-1 md:py-1.5 rounded-lg ${seg.isPrimary ? 'bg-indigo-600 text-white' : 'bg-slate-500 text-white'}`}>
+                                   {seg.isPrimary ? 'الأساسي' : 'المتطابق'}
+                                 </span>
+                              ) : (
+                                 (discoveryMode === 'balance_letters' || discoveryMode === 'balance_values') && <span className={`text-[9px] md:text-[10px] font-bold px-2 md:px-3 py-1 md:py-1.5 rounded-lg ${color.badge}`}>النص {idx + 1}</span>
+                              )}
+                              
+                              <span className={`text-[10px] md:text-sm font-bold px-2 md:px-3 py-1 md:py-1.5 rounded-lg border transition-colors ${highlightLetters ? 'bg-cyan-500/20 text-cyan-600 border-cyan-500/50' : `${t.textMuted} ${t.panel} ${t.borderFocus}`}`}>
+                                 {seg.letterCount} حرف
+                              </span>
+                              <span className={`text-[10px] md:text-sm font-bold px-2 md:px-3 py-1 md:py-1.5 rounded-lg border transition-colors ${highlightValue ? 'bg-[#d4af37]/20 text-[#d4af37] border-[#d4af37]/50' : `${t.textMuted} ${t.panel} ${t.borderFocus}`}`}>
+                                 قيمة {seg.sum}
+                              </span>
+                              
+                              {discoveryMode === '19_letters' && <span className="text-[10px] md:text-sm font-bold text-emerald-600 bg-emerald-500/20 px-2 md:px-3 py-1 md:py-1.5 rounded-lg border border-emerald-500/30">19 × {seg.letterCount / 19}</span>}
+                              {discoveryMode === '19_values' && <span className="text-[10px] md:text-sm font-bold text-emerald-600 bg-emerald-500/20 px-2 md:px-3 py-1 md:py-1.5 rounded-lg border border-emerald-500/30">19 × {seg.sum / 19}</span>}
+                           </div>
+                           
+                           {/* 🌟 النص القرآني (تم تقليل ارتفاع السطر قليلاً للهاتف) */}
+                           <p className={`font-['Amiri_Quran'] text-xl md:text-3xl leading-[3.5rem] md:leading-[5rem] text-center ${t.quranText} pt-1 pb-1 px-1 md:px-2 overflow-visible`}>
+                             "{getDiscoveryTextSnippet(seg)}"
+                           </p>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
+                
+                {/* 🌟 شريط التنقل (الأسهم) - تم نقله بالكامل للأسفل لإنقاذ مساحة الشاشة! */}
+                <div className={`flex items-center justify-between mt-4 md:mt-6 p-2 bg-black/5 dark:bg-white/5 rounded-2xl border ${t.border}`}>
+                  <button onClick={() => setActiveDiscoveryIndex(prev => Math.min(prev + 1, discoveries.length - 1))} disabled={activeDiscoveryIndex === discoveries.length - 1} className={`p-2.5 ${t.input} ${t.textMuted} rounded-xl hover:${t.text} disabled:opacity-30 border ${t.borderFocus}`}>
+                    <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
+                  </button>
+                  
+                  <span className={`font-bold text-xs md:text-sm ${t.text}`}>
+                    نتيجة {activeDiscoveryIndex + 1} من {discoveries.length}
+                  </span>
+                  
+                  <button onClick={() => setActiveDiscoveryIndex(prev => Math.max(prev - 1, 0))} disabled={activeDiscoveryIndex === 0} className={`p-2.5 ${t.input} ${t.textMuted} rounded-xl hover:${t.text} disabled:opacity-30 border ${t.borderFocus}`}>
+                    <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
+                  </button>
+                </div>
+
               </div>
             )}
 
@@ -2037,111 +2260,130 @@ return (
           
 {/* قائمة التمشيط المنسدلة للأعلى */}
           {showToolsMenu && (
-            <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-[95%] md:w-[420px] neo-out rounded-3xl p-3 animate-fade-in-up z-50 flex flex-col max-h-[65vh]`}>
+            <div className={`absolute bottom-full left-0 right-0 mx-auto mb-3 w-[92%] md:w-[420px] neo-out rounded-2xl md:rounded-3xl p-3 md:p-4 animate-fade-in-up z-50 flex flex-col max-h-[65vh]`}>
               
-              <div className={`flex justify-between items-center mb-3 px-2 pb-2 border-b border-black/5 dark:border-white/5 shrink-0`}>
-                <span className={`font-bold ${t.text} text-base md:text-lg flex items-center`}>
-                  <Layers className="w-5 h-5 ml-2 text-[#b48f27] dark:text-[#d4af37]"/> التمشيط والاستكشاف
+              <div className={`flex justify-between items-center mb-2 md:mb-3 px-2 pb-2 border-b border-black/5 dark:border-white/5 shrink-0`}>
+                <span className={`font-bold ${t.text} text-sm md:text-lg flex items-center`}>
+                  <Layers className="w-4 h-4 md:w-5 md:h-5 ml-2 text-[#b48f27] dark:text-[#d4af37]"/> التمشيط والاستكشاف
                 </span>
                 <button onClick={() => setShowToolsMenu(false)} className={`${t.textMuted} hover:text-red-600 dark:hover:text-red-500 neo-out active:neo-in rounded-xl p-1.5 transition-colors`}>
-                  <X className="w-5 h-5"/>
+                  <X className="w-4 h-4 md:w-5 md:h-5"/>
                 </button>
               </div>
 
-              <div className="space-y-2.5 overflow-y-auto custom-scrollbar pr-1">
-                  <button onClick={() => runDiscovery('19_letters')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
-                    <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Scale className="w-5 h-5 text-emerald-700 dark:text-emerald-500"/></div>
+              <div className="space-y-2 overflow-y-auto custom-scrollbar pr-1 pb-1">
+                  <button onClick={() => runDiscovery('19_letters')} className={`w-full flex items-center text-right p-2.5 md:p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                    <div className="neo-in p-2 md:p-2.5 rounded-lg ml-3 shrink-0"><Scale className="w-4 h-4 md:w-5 md:h-5 text-emerald-700 dark:text-emerald-500"/></div>
                     <div>
-                      {/* 🌟 تم استخدام t.text و t.textMuted لضمان التباين في الوضعين */}
-                      <p className={`font-bold text-sm md:text-base ${t.text}`}>مضاعفات 19 (في الحروف)</p>
-                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>نصوص عدد حروفها يقبل القسمة على 19</p>
+                      <p className={`font-bold text-xs md:text-base ${t.text}`}>مضاعفات 19 (في الحروف)</p>
+                      <p className={`text-[9px] md:text-xs ${t.textMuted} mt-0.5 md:mt-1`}>نصوص عدد حروفها يقبل القسمة على 19</p>
                     </div>
                   </button>
                   
-                  <button onClick={() => runDiscovery('19_values')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
-                    <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Hash className="w-5 h-5 text-emerald-700 dark:text-emerald-500"/></div>
+                  <button onClick={() => runDiscovery('19_values')} className={`w-full flex items-center text-right p-2.5 md:p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                    <div className="neo-in p-2 md:p-2.5 rounded-lg ml-3 shrink-0"><Hash className="w-4 h-4 md:w-5 md:h-5 text-emerald-700 dark:text-emerald-500"/></div>
                     <div>
-                      <p className={`font-bold text-sm md:text-base ${t.text}`}>مضاعفات 19 (في القيم العددية)</p>
-                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>نصوص قيمتها تقبل القسمة على 19</p>
+                      <p className={`font-bold text-xs md:text-base ${t.text}`}>مضاعفات 19 (في القيم العددية)</p>
+                      <p className={`text-[9px] md:text-xs ${t.textMuted} mt-0.5 md:mt-1`}>نصوص قيمتها تقبل القسمة على 19</p>
                     </div>
                   </button>
                   
-                  <button onClick={() => runDiscovery('balance_letters')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
-                   <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Scale className="w-5 h-5 text-cyan-700 dark:text-cyan-500"/></div>
+                  <button onClick={() => runDiscovery('balance_letters')} className={`w-full flex items-center text-right p-2.5 md:p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                   <div className="neo-in p-2 md:p-2.5 rounded-lg ml-3 shrink-0"><Scale className="w-4 h-4 md:w-5 md:h-5 text-cyan-700 dark:text-cyan-500"/></div>
                     <div>
-                      <p className={`font-bold text-sm md:text-base ${t.text}`}>توازنات الحروف (نصين فأكثر)</p>
-                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>تطابق نصوص منفصلة في عدد الحروف</p>
+                      <p className={`font-bold text-xs md:text-base ${t.text}`}>توازنات الحروف (نصين فأكثر)</p>
+                      <p className={`text-[9px] md:text-xs ${t.textMuted} mt-0.5 md:mt-1`}>تطابق نصوص منفصلة في عدد الحروف</p>
                     </div>
                   </button>
                   
-                  <button onClick={() => runDiscovery('balance_values')} className={`w-full flex items-center text-right p-3 neo-out active:neo-in rounded-xl transition-all`}>
-                    <div className="neo-in p-2.5 rounded-lg ml-3 shrink-0"><Hash className="w-5 h-5 text-purple-700 dark:text-purple-500"/></div>
+                  <button onClick={() => runDiscovery('balance_values')} className={`w-full flex items-center text-right p-2.5 md:p-3 neo-out active:neo-in rounded-xl transition-all`}>
+                    <div className="neo-in p-2 md:p-2.5 rounded-lg ml-3 shrink-0"><Hash className="w-4 h-4 md:w-5 md:h-5 text-purple-700 dark:text-purple-500"/></div>
                     <div>
-                      <p className={`font-bold text-sm md:text-base ${t.text}`}>توازنات القيم العددية (نصين فأكثر)</p>
-                      <p className={`text-[10px] md:text-xs ${t.textMuted} mt-1`}>تطابق نصوص منفصلة في حساب الجُمَّل</p>
+                      <p className={`font-bold text-xs md:text-base ${t.text}`}>توازنات القيم (نصين فأكثر)</p>
+                      <p className={`text-[9px] md:text-xs ${t.textMuted} mt-0.5 md:mt-1`}>تطابق نصوص منفصلة في حساب الجُمَّل</p>
                     </div>
                   </button>
               </div>
             </div>
           )}
 
-{/* 🌟 شريط أدوات التحديد (تمت محاذاته وتصحيح ألوان النصوص لتتناسب مع الوضعين النهاري والليلي بوضوح تام) */}
-          {/* 🌟 شريط أدوات التحديد (تمت إضافة مساحة p-3 لمنع قص الظل) */}
-          <div className="flex items-center justify-between max-w-4xl mx-auto w-full gap-2 overflow-x-auto custom-scrollbar px-3 py-3 mb-1">
+{/* 🌟 شريط أدوات التحديد مع أسهم التوجيه الذكية */}
+          <div className="relative max-w-4xl mx-auto w-full mb-1">
             
-            {/* الجزء الأيمن */}
-            <div className="flex-1 flex justify-start shrink-0 min-w-[80px]">
+            {/* السهم الأيمن (تصميم دائري طافي لتجنب ظلال المتصفحات المزعجة) */}
+            {showRightArrow && (
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center pointer-events-none md:hidden">
+                 <div className="w-7 h-7 rounded-full neo-out flex items-center justify-center shadow-sm">
+                   <ChevronRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+                 </div>
+              </div>
+            )}
+
+<div 
+              ref={toolsScrollRef}
+              onScroll={handleToolsScroll}
+              className="flex items-center overflow-x-auto hide-scrollbar flex-nowrap gap-2 w-full px-2 py-2"
+            >
               {(selectedWords.size > 0 || selectedAyahs.size > 0) && (
-                <button onClick={handleCopySelectedText} className="flex items-center px-3 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-out active:neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-                  <Copy className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1" /> <span className="hidden md:inline">نسخ التحديد</span><span className="inline md:hidden">نسخ</span>
+                <button onClick={handleCopySelectedText} className="shrink-0 flex items-center px-4 py-2 rounded-xl text-[11px] md:text-sm font-bold transition-all neo-out active:neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                  <Copy className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5" /> نسخ التحديد
                 </button>
               )}
-            </div>
-            
-            {/* الجزء الأوسط */}
-            <div className="flex items-center justify-center gap-1.5 md:gap-2 shrink-0">
-              <button onClick={() => { setSelectionMode('word'); clearSelection(); setShowToolsMenu(false); }} className={`flex items-center px-3 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all ${selectionMode === 'word' ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
-                <Type className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 text-[#b48f27] dark:text-[#d4af37]" /> تحديد حر
+
+              {/* 🌟 الزر الجديد: تصفح حر (الوضع الافتراضي للقراءة) */}
+              <button onClick={() => { setSelectionMode('none'); clearSelection(); setShowToolsMenu(false); }} className={`shrink-0 flex items-center px-4 py-2 rounded-xl text-[11px] md:text-sm font-bold transition-all whitespace-nowrap ${selectionMode === 'none' ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
+                <Hand className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 text-[#b48f27] dark:text-[#d4af37]" /> تصفح حر
               </button>
-              <button onClick={() => { setSelectionMode('ayah'); clearSelection(); setShowToolsMenu(false); }} className={`flex items-center px-3 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all ${selectionMode === 'ayah' ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
-                <Book className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 text-[#b48f27] dark:text-[#d4af37]" /> تحديد آيات
+              
+              <button onClick={() => { setSelectionMode('word'); clearSelection(); setShowToolsMenu(false); }} className={`shrink-0 flex items-center px-4 py-2 rounded-xl text-[11px] md:text-sm font-bold transition-all whitespace-nowrap ${selectionMode === 'word' ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
+                <Type className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 text-[#b48f27] dark:text-[#d4af37]" /> تحديد حر
               </button>
-            </div>
-            
-            {/* الجزء الأيسر */}
-            <div className="flex-1 flex justify-end shrink-0 min-w-[80px]">
+              
+              <button onClick={() => { setSelectionMode('ayah'); clearSelection(); setShowToolsMenu(false); }} className={`shrink-0 flex items-center px-4 py-2 rounded-xl text-[11px] md:text-sm font-bold transition-all whitespace-nowrap ${selectionMode === 'ayah' ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in ${t.text} hover:text-[#b48f27] dark:hover:text-[#d4af37]`}`}>
+                <Book className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 text-[#b48f27] dark:text-[#d4af37]" /> تحديد آيات
+              </button>
+              
               {(selectedWords.size > 0 || selectedAyahs.size > 0) && (
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setIsExportModalOpen(true)} className="flex items-center px-2.5 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-out active:neo-in text-[#b48f27] dark:text-[#d4af37] whitespace-nowrap">
-                    <Share2 className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 inline" /> <span className="hidden md:inline">تصدير</span>
+                <>
+                  <button onClick={() => setIsExportModalOpen(true)} className="shrink-0 flex items-center px-4 py-2 rounded-xl text-[11px] md:text-sm font-bold transition-all neo-out active:neo-in text-[#b48f27] dark:text-[#d4af37] whitespace-nowrap">
+                    <Share2 className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5" /> تصدير
                   </button>
-                  <button onClick={handleAddToStash} className="flex items-center px-2.5 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-out active:neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-                    <Plus className="w-3 h-3 md:w-3.5 md:h-3.5 ml-1 inline" /> <span className="hidden md:inline">إضافة</span>
+                  <button onClick={handleAddToStash} className="shrink-0 flex items-center px-4 py-2 rounded-xl text-[11px] md:text-sm font-bold transition-all neo-out active:neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                    <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5" /> إضافة
                   </button>
                   {stashedResults.length > 0 && (
-                    <button onClick={() => setIsCanvasModalOpen(true)} className="flex items-center px-2.5 py-1 md:py-1.5 rounded-xl text-[10px] md:text-xs font-bold transition-all neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                    <button onClick={() => setIsCanvasModalOpen(true)} className="shrink-0 flex items-center px-4 py-2 rounded-xl text-[11px] md:text-sm font-bold transition-all neo-in text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
                       اللوحة ({stashedResults.length})
                     </button>
                   )}
-                </div>
+                </>
               )}
             </div>
+
+            {/* السهم الأيسر */}
+            {showLeftArrow && (
+              <div className="absolute left-1 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center pointer-events-none md:hidden">
+                 <div className="w-7 h-7 rounded-full neo-out flex items-center justify-center shadow-sm">
+                   <ChevronLeft className="w-4 h-4 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+                 </div>
+              </div>
+            )}
           </div>
           
-          {/* 🌟 الأزرار الثلاثة الرئيسية */}
-          <div className="flex justify-center gap-2 md:gap-3 max-w-4xl mx-auto w-full">
-            <button onClick={handleCalculateStats} className={`flex-1 flex flex-row items-center justify-center neo-out active:neo-in ${t.text} py-1.5 md:py-2 rounded-xl font-bold transition-all`}>
-              <BarChart3 className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 text-indigo-700 dark:text-indigo-400" /> <span className="text-[11px] md:text-sm tracking-wide">1. إحصاء النص</span>
+          {/* 🌟 الأزرار الثلاثة الرئيسية (قابلة للسحب إذا ضاقت الشاشة جداً) */}
+          <div className="flex items-center overflow-x-auto hide-scrollbar flex-nowrap gap-2 md:gap-3 max-w-4xl mx-auto w-full px-2 pb-1">
+            <button onClick={handleCalculateStats} className={`shrink-0 min-w-[110px] flex-1 flex flex-row items-center justify-center neo-out active:neo-in ${t.text} py-2.5 rounded-xl font-bold transition-all whitespace-nowrap`}>
+              <BarChart3 className="w-4 h-4 ml-1.5 text-indigo-700 dark:text-indigo-400" /> <span className="text-xs md:text-sm tracking-wide">1. إحصاء النص</span>
             </button>
             
-            <button onClick={() => { if(discoveries.length > 0) clearSelection(); else setShowToolsMenu(!showToolsMenu); }} disabled={isDiscovering} className={`flex-[1.5] flex flex-row items-center justify-center py-1.5 md:py-2 rounded-xl font-bold transition-all ${discoveries.length > 0 ? 'neo-in text-red-600 dark:text-red-500' : (showToolsMenu ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in text-[#b48f27] dark:text-[#d4af37]`)}`}>
-              {discoveries.length > 0 ? <X className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5" /> : <ListFilter className={`w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 ${isDiscovering ? 'animate-pulse' : ''}`} />}
-              <span className="text-[11px] md:text-sm tracking-wide">{isDiscovering ? 'جاري التمشيط...' : (discoveries.length > 0 ? 'إلغاء البحث' : '2. تمشيط واستكشاف')}</span>
+            <button onClick={() => { if(discoveries.length > 0) clearSelection(); else setShowToolsMenu(!showToolsMenu); }} disabled={isDiscovering} className={`shrink-0 min-w-[150px] flex-[1.5] flex flex-row items-center justify-center py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${discoveries.length > 0 ? 'neo-in text-red-600 dark:text-red-500' : (showToolsMenu ? 'neo-in text-[#b48f27] dark:text-[#d4af37]' : `neo-out active:neo-in text-[#b48f27] dark:text-[#d4af37]`)}`}>
+              {discoveries.length > 0 ? <X className="w-4 h-4 ml-1.5" /> : <ListFilter className={`w-4 h-4 ml-1.5 ${isDiscovering ? 'animate-pulse' : ''}`} />}
+              <span className="text-xs md:text-sm tracking-wide">{isDiscovering ? 'جاري التمشيط...' : (discoveries.length > 0 ? 'إلغاء البحث' : '2. تمشيط واستكشاف')}</span>
             </button>
 
-            <button onClick={() => {setActiveTab('library'); setShowToolsMenu(false);}} className={`flex-1 flex flex-row items-center justify-center neo-out active:neo-in ${t.text} py-1.5 md:py-2 rounded-xl font-bold transition-all relative`}>
-              <BookmarkPlus className="w-3.5 h-3.5 md:w-4 md:h-4 ml-1.5 text-[#b48f27] dark:text-[#d4af37]" /> <span className="text-[11px] md:text-sm tracking-wide">مكتبتي</span>
-              {savedDiscoveries.length > 0 && <span className="absolute -top-1 -left-1 neo-in text-white bg-red-600 dark:bg-transparent dark:text-red-500 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">{savedDiscoveries.length}</span>}
+            <button onClick={() => {setActiveTab('library'); setShowToolsMenu(false);}} className={`shrink-0 min-w-[100px] flex-1 flex flex-row items-center justify-center neo-out active:neo-in ${t.text} py-2.5 rounded-xl font-bold transition-all relative whitespace-nowrap`}>
+              <BookmarkPlus className="w-4 h-4 ml-1.5 text-[#b48f27] dark:text-[#d4af37]" /> <span className="text-xs md:text-sm tracking-wide">مكتبتي</span>
+              {savedDiscoveries.length > 0 && <span className="absolute -top-1 -left-1 neo-in text-white bg-red-600 dark:bg-transparent dark:text-red-500 text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{savedDiscoveries.length}</span>}
             </button>
           </div>
         </div>
@@ -2381,72 +2623,56 @@ return (
                               )}
                             </div>
 
-<div className="space-y-3 text-sm neo-in p-4 rounded-xl">
+{/* 🌟 منطقة الإحصائيات (باستخدام الجدول في جميع الأسطر لضمان محاذاة رأسية مطلقة) */}
+                            <div className="space-y-4 neo-in p-4 rounded-xl w-full">
                               
-                              {/* 🌟 عدد الكلمات */}
-                              <div className="flex justify-between items-center">
-                                <span 
-                                  className={isDarkMode ? "text-cyan-400 font-bold" : "font-bold transition-colors"}
-                                  style={!isDarkMode ? { color: isWords19 ? '#9333ea' : '#0284c7' } : {}}>
-                                  عدد الكلمات:
-                                </span>
-                                <span 
-                                  className={isDarkMode ? `${t.text} font-bold flex items-center gap-2 text-lg` : "font-bold flex items-center gap-2 text-lg transition-colors"}
-                                  style={!isDarkMode ? { color: isWords19 ? '#9333ea' : '#0284c7' } : {}}>
-                                  {isWords19 && (
-                                    <span 
-                                      className={isDarkMode ? "text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" : "text-xs px-2 py-0.5 rounded-md border"}
-                                      style={!isDarkMode ? { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' } : {}}
-                                      dir="ltr">
-                                      19 × {item.wordCount / 19}
-                                    </span>
-                                  )}
-                                  {item.wordCount} كلمة
-                                </span>
+                              {/* عدد الكلمات */}
+                              <div className="flex justify-between items-center w-full">
+                                <span className="font-bold shrink-0" style={isDarkMode ? { color: '#38bdf8' } : { color: isWords19 ? '#9333ea' : '#0284c7' }}>عدد الكلمات:</span>
+                                <table style={{ borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0 }}>
+                                  <tbody><tr>
+                                    {isWords19 && <td style={{ padding: 0, paddingRight: '12px', verticalAlign: 'middle' }}><div dir="ltr" className="text-xs px-2 py-0.5 rounded-md border" style={isDarkMode ? { color: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', borderColor: 'rgba(52, 211, 153, 0.2)' } : { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' }}>19 × {item.wordCount / 19}</div></td>}
+                                    <td style={{ padding: 0, verticalAlign: 'middle', textAlign: 'left' }}><span className="font-bold text-lg" style={isDarkMode ? { color: '#f8fafc' } : { color: isWords19 ? '#9333ea' : '#0284c7' }}>{item.wordCount} كلمة</span></td>
+                                  </tr></tbody>
+                                </table>
                               </div>
                               
-                              {/* 🌟 عدد الحروف */}
-                              <div className="flex justify-between items-center">
-                                <span 
-                                  className={isDarkMode ? "text-cyan-400 font-bold" : "font-bold transition-colors"}
-                                  style={!isDarkMode ? { color: isLetters19 ? '#9333ea' : '#0284c7' } : {}}>
-                                  عدد الحروف:
-                                </span>
-                                <span 
-                                  className={isDarkMode ? `${t.text} font-bold flex items-center gap-2 text-lg` : "font-bold flex items-center gap-2 text-lg transition-colors"}
-                                  style={!isDarkMode ? { color: isLetters19 ? '#9333ea' : '#0284c7' } : {}}>
-                                  {isLetters19 && (
-                                    <span 
-                                      className={isDarkMode ? "text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" : "text-xs px-2 py-0.5 rounded-md border"}
-                                      style={!isDarkMode ? { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' } : {}}
-                                      dir="ltr">
-                                      19 × {item.count / 19}
-                                    </span>
-                                  )}
-                                  {item.count} حرف
-                                </span>
+                              {/* عدد الحروف */}
+                              <div className="flex justify-between items-center w-full">
+                                <span className="font-bold shrink-0" style={isDarkMode ? { color: '#38bdf8' } : { color: isLetters19 ? '#9333ea' : '#0284c7' }}>عدد الحروف:</span>
+                                <table style={{ borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0 }}>
+                                  <tbody><tr>
+                                    {isLetters19 && <td style={{ padding: 0, paddingRight: '12px', verticalAlign: 'middle' }}><div dir="ltr" className="text-xs px-2 py-0.5 rounded-md border" style={isDarkMode ? { color: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', borderColor: 'rgba(52, 211, 153, 0.2)' } : { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' }}>19 × {item.count / 19}</div></td>}
+                                    <td style={{ padding: 0, verticalAlign: 'middle', textAlign: 'left' }}><span className="font-bold text-lg" style={isDarkMode ? { color: '#f8fafc' } : { color: isLetters19 ? '#9333ea' : '#0284c7' }}>{item.count} حرف</span></td>
+                                  </tr></tbody>
+                                </table>
                               </div>
                               
-                              {/* 🌟 القيمة العددية */}
-                              <div className="flex justify-between items-center border-t border-black/5 dark:border-white/5 pt-3 mt-3">
-                                <span 
-                                  className="font-bold transition-colors"
-                                  style={isDarkMode ? { color: '#d4af37' } : { color: isValue19 ? '#9333ea' : '#065f46' }}>
-                                  القيمة العددية:
-                                </span>
-                                <span 
-                                  className="font-bold flex items-center gap-2 text-lg transition-colors"
-                                  style={isDarkMode ? { color: '#d4af37' } : { color: isValue19 ? '#9333ea' : '#065f46' }}>
-                                  {isValue19 && (
-                                    <span 
-                                      className={isDarkMode ? "text-emerald-400 text-xs bg-emerald-400/10 px-2 py-0.5 rounded-md border border-emerald-400/20" : "text-xs px-2 py-0.5 rounded-md border"}
-                                      style={!isDarkMode ? { color: '#9333ea', backgroundColor: 'rgba(147, 51, 234, 0.1)', borderColor: 'rgba(147, 51, 234, 0.2)' } : {}}
-                                      dir="ltr">
-                                      19 × {item.numericalValue / 19}
-                                    </span>
-                                  )}
-                                  {item.numericalValue}
-                                </span>
+{/* القيمة العددية (معادلة حرة بدون صندوق لتفادي مشاكل الحجم والمحاذاة عند التصدير) */}
+                              <div className="flex justify-between items-center border-t border-slate-200 dark:border-white/10 pt-3 mt-2 w-full">
+                                <span className="text-[#d4af37] font-bold shrink-0">القيمة العددية:</span>
+                                
+                                <table style={{ borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0, backgroundColor: 'transparent' }}>
+                                  <tbody>
+                                    <tr>
+                                      <td style={{ padding: 0, verticalAlign: 'middle', textAlign: 'center' }}>
+                                        
+                                        {/* الرقم الأساسي (مع مسافة سفلية بسيطة تفصله عن المعادلة) */}
+                                        <div className="text-[#d4af37] font-bold text-xl leading-none" style={{ paddingBottom: isValue19 ? '6px' : '0' }}>
+                                          {item.numericalValue}
+                                        </div>
+                                        
+                                        {/* المعادلة كنص حر متمركز (بدون صندوق، بخط أوضح) */}
+                                        {isValue19 && (
+                                          <div dir="ltr" className="font-bold whitespace-nowrap" style={{ fontSize: '17px', color: '#10b981' }}>
+                                            ( 19 × {item.numericalValue / 19} )
+                                          </div>
+                                        )}
+                                        
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
                               </div>
                             </div>
                           </div>
@@ -2457,14 +2683,51 @@ return (
                   </div>
                 </div>
 
-                <div className={`p-6 border-t ${t.border} flex gap-4 shrink-0`}>
-                  {/* 🌟 إصلاح لون زر التصدير ليقرأ من الثيم بدلاً من الأبيض الثابت */}
-                  <button onClick={handleExportCanvas} className={`flex-[2] ${t.text} font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 shadow-sm transition-colors neo-out active:neo-in border-none`}>
-                    <Download className="w-5 h-5 text-teal-700 dark:text-teal-400" /> تصدير اللوحة كصورة
+{/* 🌟 أزرار التحكم (بدون شريط أسود + الزر التفاعلي الذكي) */}
+                <div className={`p-6 border-t ${t.border} flex gap-3 shrink-0 rounded-b-3xl`}>
+                  
+                  {/* زر التصدير الذكي (يتغير نصه ولونه بناءً على الحالة) */}
+                  <button 
+                    onClick={handleExportCanvas}
+                    disabled={exportStatus !== 'idle'}
+                    className={`flex-[2] font-bold py-3 rounded-xl flex justify-center items-center gap-2 transition-all duration-300 ${
+                      exportStatus === 'success' 
+                        ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(5,150,105,0.4)]' 
+                        : exportStatus === 'error'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-teal-700 hover:bg-teal-600 text-white dark:bg-teal-600 dark:hover:bg-teal-500'
+                    } ${exportStatus === 'loading' ? 'opacity-80 cursor-default' : ''}`}
+                  >
+                    {exportStatus === 'idle' && (
+                      <><Download className="w-5 h-5" /> تصدير اللوحة كصورة</>
+                    )}
+                    {exportStatus === 'loading' && (
+                      <span className="animate-pulse">جاري التصدير...</span>
+                    )}
+                    {exportStatus === 'success' && (
+                      <span className="flex items-center gap-2 drop-shadow-md">تم حفظ صورة التقرير! ✅</span>
+                    )}
+                    {exportStatus === 'error' && (
+                      <span>حدث خطأ، حاول مجدداً ❌</span>
+                    )}
                   </button>
-                  <button onClick={() => { if(window.confirm('هل أنت متأكد من إفراغ اللوحة؟')) { setStashedResults([]); setIsCanvasModalOpen(false); } }} className={`flex-1 text-red-600 dark:text-red-500 font-bold py-3.5 rounded-2xl flex justify-center items-center transition-colors neo-out active:neo-in`}>
+
+                  {/* زر إفراغ اللوحة (متوافق مع الثيم النهاري والليلي) */}
+                  <button 
+                    onClick={() => {
+                        if(window.confirm('هل أنت متأكد من إفراغ اللوحة وحذف كل النتائج؟')) {
+                            setStashedResults([]);
+                            setIsCanvasModalOpen(false);
+                        }
+                    }} 
+                    disabled={exportStatus === 'loading'}
+                    className={`flex-1 font-bold py-3 rounded-xl flex justify-center items-center transition-colors ${
+                      exportStatus === 'loading' ? 'opacity-50 cursor-not-allowed' : ''
+                    } bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-500/20 dark:hover:bg-red-500/40 dark:text-red-700 dark:hover:text-red-600`}
+                  >
                     إفراغ اللوحة
                   </button>
+                  
                 </div>
               </div>
             </div>
