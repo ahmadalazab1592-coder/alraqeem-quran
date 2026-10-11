@@ -1888,7 +1888,7 @@ const handleDragStart = (wordId) => {
                            </div>
                            
                            {/* 🌟 النص القرآني (تم تقليل ارتفاع السطر قليلاً للهاتف) */}
-                           <p className={`font-['Amiri_Quran'] text-2xl md:text-5xl leading-[3.5rem] md:leading-[5rem] text-center ${t.quranText} pt-1 pb-1 px-1 md:px-2 overflow-visible`}>
+                           <p className={`font-['Amiri_Quran'] text-xl md:text-3xl leading-[3.5rem] md:leading-[5rem] text-center ${t.quranText} pt-1 pb-1 px-1 md:px-2 overflow-visible`}>
                              "{getDiscoveryTextSnippet(seg)}"
                            </p>
                         </div>
@@ -1916,7 +1916,7 @@ const handleDragStart = (wordId) => {
             )}
 
             {/* النص القرآني المصفح */}
-            <div className={`text-justify leading-[4.5rem] md:leading-[5.5rem] ${isDarkMode ? t.panel : 'bg-[#fdf6e3] border-[#e8d89e]'} p-6 md:p-10 rounded-3xl shadow-md border select-none`} style={{ fontFamily: "'Amiri Quran', serif", fontSize: '2rem' }}>
+            <div className={`text-justify leading-[4.5rem] md:leading-[5.5rem] ${isDarkMode ? t.panel : 'bg-[#fdf6e3] border-[#e8d89e]'} p-6 md:p-10 rounded-3xl shadow-md border select-none`} style={{ fontFamily: "'Amiri Quran', serif", fontSize: '2.4rem' }}>
               
               {currentPage === 1 && activeSurahId !== 1 && activeSurahId !== 9 && (
                 <div className={`text-center mb-10 pb-8 border-b ${t.border}`}>
