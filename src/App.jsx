@@ -1916,7 +1916,7 @@ const handleDragStart = (wordId) => {
             )}
 
             {/* النص القرآني المصفح */}
-            <div className={`text-justify leading-[4.5rem] md:leading-[5.5rem] ${isDarkMode ? t.panel : 'bg-[#fdf6e3] border-[#e8d89e]'} p-6 md:p-10 rounded-3xl shadow-md border select-none`} style={{ fontFamily: "'Amiri Quran', serif", fontSize: '2.4rem' }}>
+            <div className={`text-justify leading-[4.5rem] md:leading-[5.5rem] ${isDarkMode ? t.panel : 'bg-[#fdf6e3] border-[#e8d89e]'} p-6 md:p-10 rounded-3xl shadow-md border select-none`} style={{ fontFamily: "'Amiri Quran', serif", fontSize: '2rem' }}>
               
               {currentPage === 1 && activeSurahId !== 1 && activeSurahId !== 9 && (
                 <div className={`text-center mb-10 pb-8 border-b ${t.border}`}>
@@ -1988,11 +1988,15 @@ let segmentIndex = -1; let isStartOfSegment = false; let isEndOfSegment = false;
                       else if (selectionMode === 'word' && discoveries.length === 0 && !statsData) { styleClasses += 'cursor-pointer rounded-lg hover:text-[#d4af37]'; }
                     
                       
-                      return (
-                        <span key={index} data-wordid={fw.wordId} onMouseDown={() => handleDragStart(fw.wordId)} onMouseEnter={() => handleDragEnter(fw.wordId)} onTouchStart={() => handleDragStart(fw.wordId)} onClick={() => handleWordClick(fw.wordId)} className={`${styleClasses} ${wordColorClass || t.quranText} ${wordColorClass === '' ? 'relative z-10 ' : ''}`}>
-                          {badgeElement} {word}
-                        </span>
-                      );
+return (
+    <React.Fragment key={index}>
+      <span data-wordid={fw.wordId} onMouseDown={() => handleDragStart(fw.wordId)} onMouseEnter={() => handleDragEnter(fw.wordId)} onTouchStart={() => handleDragStart(fw.wordId)} onClick={() => handleWordClick(fw.wordId)} className={`${styleClasses} ${wordColorClass || t.quranText} ${wordColorClass === '' ? 'relative z-10 ' : ''}`}>
+        {badgeElement} {word}
+      </span>
+      {/* 🌟 السر هنا: إضافة مسافة فارغة حقيقية بعد كل كلمة ليتمكن المتصفح من تمديد السطر */}
+      {' '}
+    </React.Fragment>
+  );
                     })}
                     
                     {/* النجمة المتوهجة */}
