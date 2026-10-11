@@ -1546,8 +1546,8 @@ const handleDragStart = (wordId) => {
               <div className="p-6 neo-in rounded-2xl text-center mb-8 border border-cyan-500/10">
                 <h4 className={`text-sm ${t.textMuted} mb-2 font-bold`}>إعداد وتصميم</h4>
                 <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-400 mb-5" style={{ fontFamily: "'Amiri Quran', serif" }}>أحمد طلعت</p>
-                <a href="mailto:ahmadalazab2022@gmail.com" className="inline-flex items-center justify-center gap-2 text-sm text-cyan-700 dark:text-cyan-400 hover:text-cyan-500 neo-out active:neo-in px-5 py-2.5 rounded-xl transition-colors font-bold" dir="ltr">
-                    <Mail className="w-4 h-4" /> ahmadalazab2022@gmail.com
+                <a href="mailto:ahmadalazab1592@gmail.com" className="inline-flex items-center justify-center gap-2 text-sm text-cyan-700 dark:text-cyan-400 hover:text-cyan-500 neo-out active:neo-in px-5 py-2.5 rounded-xl transition-colors font-bold" dir="ltr">
+                    <Mail className="w-4 h-4" /> ahmadalazab1592@gmail.com
                 </a>
               </div>
               
